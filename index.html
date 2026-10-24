@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="AdmBca">
 <link rel="apple-touch-icon" id="appleIcon">
 <meta name="theme-color" content="#101820">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://esm.sh https://cdnjs.cloudflare.com; connect-src 'self' https://okrfnucuombayysmdviq.supabase.co wss://okrfnucuombayysmdviq.supabase.co https://esm.sh; img-src 'self' data: blob: https://okrfnucuombayysmdviq.supabase.co; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self'; manifest-src 'self' blob: data:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>AdmBca · Control de Ingresos y Gastos</title>
 <style>
   :root{
@@ -40,6 +41,19 @@
   .month-pill{background:var(--navy-soft);border:1px solid var(--navy-line);padding:7px 13px;border-radius:20px;font-size:12.5px;font-weight:600;color:var(--muted-light);display:flex;align-items:center;gap:6px;cursor:pointer;}
   .month-pill svg{width:13px;height:13px;}
   .view{display:none;padding:18px 16px 8px;animation:fade .25s ease;}
+  /* v7.3: computadora. En pantallas de 960 px o más el contenido se centra y el
+     Inicio se divide en dos columnas; el Corte Diario muestra las bancas en dos. */
+  @media (min-width:960px){
+    header .header-row{max-width:1200px;margin:0 auto;}
+    .view{max-width:1200px;margin:0 auto;padding:22px 28px 10px;}
+    .dash-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:22px;align-items:start;}
+    #corteList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;}
+    #corteList > .panel{margin-bottom:0 !important;}
+    #corteList > .empty-hint{grid-column:1/-1;}
+    .hoy-strip{grid-template-columns:repeat(4,minmax(0,1fr)) !important;}
+    #dashAlertas > div{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));}
+  }
+  @media (min-width:1400px){ header .header-row, .view{max-width:1320px;} }
   .view.active{display:block;}
   @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
   .section-label{font-size:11px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);margin:4px 2px 12px;}
@@ -353,9 +367,15 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
       <img class="logo-img js-logo" alt="prime sport">
       <div class="sub" style="margin-top:0;align-self:center;">Control<br>Financiero</div>
     </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+    <div class="month-pill" id="consPill" onclick="abrirSelectorConsorcio()" style="display:none;cursor:pointer;" title="Cambiar de consorcio">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/></svg>
+      <span id="consPillTxt">—</span><span style="font-size:10px;">▾</span>
+    </div>
     <div class="month-pill" onclick="openMonthModal()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       <span id="monthLabel">—</span>
+    </div>
     </div>
   </div>
 </header>
@@ -367,6 +387,7 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
 </div>
 
 <section class="view active" id="view-dash">
+  <div id="hoyStrip" class="hoy-strip" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px;"></div>
   <div id="avisoCargando" style="display:none;background:#eef6fb;border:1px solid #cfe3ee;color:#2f6f86;border-radius:11px;padding:10px 12px;font-size:12.5px;font-weight:600;margin-bottom:12px;">Cargando los datos del cierre mensual…</div>
   <div class="hero-card">
     <div class="label">Balance Neto del Mes</div>
@@ -384,9 +405,11 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
       <span style="color:rgba(255,255,255,.62);font-size:11.5px;font-weight:600;">Balance de bancas del mes</span>
       <span id="heroInc" style="color:#fff;font-size:13px;font-weight:800;">RD$0</span>
     </div>
+    <div id="heroDep" style="display:none;margin-top:7px;"></div>
   </div>
   <div id="dashAlertas"></div>
 
+  <div class="dash-cols"><div class="dash-izq">
   <div data-grupo="dia">
   <div class="grp-title" style="font-size:11.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin:4px 2px 10px;">Día a día</div>
 <div style="display:flex;gap:11px;margin-bottom:16px;">
@@ -413,6 +436,18 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
     <div style="flex:1;">
       <div style="color:#fff;font-size:14.5px;font-weight:700;">Desglose de Efectivo</div>
       <div style="color:rgba(255,255,255,.78);font-size:11.5px;margin-top:1px;">Contar billetes y monedas recibidos</div>
+    </div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="width:18px;height:18px;opacity:.8;"><polyline points="9 18 15 12 9 6"/></svg>
+  </div>
+  </div>
+  <div data-mod="depositos">
+<div onclick="openDepositos()" style="background:linear-gradient(135deg,#123028,#1f6b4f);border-radius:16px;padding:15px 16px;margin-bottom:16px;display:flex;align-items:center;gap:13px;cursor:pointer;box-shadow:0 4px 16px rgba(31,107,79,.3);">
+    <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" style="width:22px;height:22px;"><path d="M3 10l9-6 9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 20h18"/></svg>
+    </div>
+    <div style="flex:1;">
+      <div style="color:#fff;font-size:14.5px;font-weight:700;">Depósitos de bancas</div>
+      <div id="depCardSub" style="color:rgba(255,255,255,.8);font-size:11.5px;margin-top:1px;">Lo que las bancas depositan al banco</div>
     </div>
     <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="width:18px;height:18px;opacity:.8;"><polyline points="9 18 15 12 9 6"/></svg>
   </div>
@@ -518,6 +553,7 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
   </div>
   </div>
 </div>
+  </div><div class="dash-der">
 
 <div class="stat-grid">
     <div class="stat">
@@ -547,6 +583,8 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
     <div class="panel-head"><h3>Ingresos por categoría</h3><span class="hint" id="catTotal">RD$0</span></div>
     <div id="catBreakdown"></div>
   </div>
+  <div class="panel" id="depDeportivaPanel" style="display:none;"></div>
+  </div></div>
 </section>
 
 <!-- REGISTRO -->
@@ -1549,7 +1587,7 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
   </div>
 
   <div class="panel" style="line-height:1.6;">
-    <div style="font-size:14px;color:var(--ink);">AdmBca es el sistema de administración de bancas del consorcio <b class="js-consorcio">—</b>. Cubre <b>caja, cuadre, virtuales y reportes</b>. Aquí está la guía rápida de cada módulo, en orden de uso diario.<br><br>El inicio está organizado en dos bloques: <b>Día a día</b> (corte diario, histórico y desglose de efectivo) y <b>Cierre mensual</b> (cuadre, máquinas, virtuales y cierre de mes, en ese orden). Solo verás los módulos que tu usuario tenga permitidos.</div>
+    <div style="font-size:14px;color:var(--ink);">AdmBca es el sistema de administración de bancas del consorcio <b class="js-consorcio">—</b>. Cubre <b>caja, cuadre, virtuales y reportes</b>. Aquí está la guía rápida de cada módulo, en orden de uso diario.<br><br>El inicio está organizado en dos bloques: <b>Día a día</b> (corte diario, histórico, desglose de efectivo y depósitos de bancas) y <b>Cierre mensual</b> (cuadre, máquinas, virtuales y cierre de mes, en ese orden). Solo verás los módulos que tu usuario tenga permitidos.</div>
   </div>
 
   <div class="panel" style="background:linear-gradient(135deg,#fdf4ec,#f8e6d5);border-color:#e8c7a5;">
@@ -1622,7 +1660,8 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
     1. Registra las <b>operaciones</b> de cada banca con el botón +.<br>
     2. En el <b>Corte Diario</b>, anota lo que el mensajero recogió de cada banca.<br>
     3. Envía la <b>ruta al mensajero</b> por WhatsApp.<br>
-    4. Cuenta el efectivo en <b>Desglose</b>.<br><br>
+    4. Cuenta el efectivo en <b>Desglose</b>.<br>
+    5. Anota en <b>Depósitos de bancas</b> lo que cada banca depositó al banco, con su soporte.<br><br>
     <b>Admin (tú):</b><br>
     • Todo lo anterior, más: <b>Cierre de Mes</b>, <b>reportes</b>, <b>virtuales</b>, <b>ajustes</b> (bancas, categorías, números de WhatsApp), y el <b>resumen de totales</b> que te llega solo a ti.</div>
   </div>
@@ -1646,6 +1685,64 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
     • <b>📊 Enviar resumen (a mí)</b>: te manda a TU número el desglose por banca y los totales generales por renglón (Deportiva, Máquinas, cada virtual).<br>
     • <b>💵 Desglose de efectivo</b>: cuenta los billetes y monedas recibidos y compáralo con lo recolectado.<br><br>
     <b>Importante:</b> las transferencias (préstamos/devoluciones) son flujo de caja, <b>no afectan el pendiente operativo</b>. Solo el mensajero (collect) lo afecta.</div>
+  </div>
+
+  <div class="panel" style="background:linear-gradient(135deg,#fdf6e8,#f8ecd2);border-color:#ecd9ac;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><div style="width:30px;height:30px;border-radius:9px;background:#3a2a12;color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;">🔒</div><h3 style="font-size:15px;font-weight:700;">Seguridad <span style="font-size:11px;color:#a3651a;font-weight:800;">NUEVO v7.1</span></h3></div>
+    <div style="font-size:13.5px;line-height:1.6;color:var(--ink);">
+    • <b>Clave maestra</b>: ahora se verifica en el servidor, guardada cifrada; ya no está en el código. Se pide para <b>reabrir un corte</b>, <b>reabrir un mes cerrado</b> y <b>quitar el candado a una lectura maestra</b>. Tras escribirla bien, tienes 10 minutos para hacer el cambio. Si se escribe mal 5 veces, se bloquea 15 minutos. Cada intento queda en la Bitácora.<br>
+    • <b>Cambiar la clave</b> (solo administrador): Ajustes → <b>Clave maestra</b>. Mínimo 8 caracteres. Mientras no la cambies, el Inicio te lo recuerda.<br>
+    • <b>Días cerrados protegidos</b>: con el corte cerrado, la base no deja crear, cambiar ni borrar movimientos de ese día, aunque alguien lo intente por fuera de la app. Para corregir, reabre el corte con la clave.<br>
+    • <b>Versión nueva</b>: cuando se publica una actualización, abajo aparece "Hay una versión nueva" con el botón <b>Actualizar</b>. Guarda lo que estés haciendo y tócalo.<br>
+    • <b>Libreta de Clientes</b>: abierta fuera del sistema, ahora pide también el código de Google Authenticator.<br>
+    • Los símbolos <b>&lt;</b> y <b>&gt;</b> escritos en notas o nombres se muestran como ‹ ›: es una protección para que nadie pueda meter código en la pantalla de otro usuario.</div>
+  </div>
+
+  <div class="panel" style="background:linear-gradient(135deg,#f1f0fa,#e6e3f5);border-color:#d3cdee;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><div style="width:30px;height:30px;border-radius:9px;background:#2a2440;color:#b9a5e8;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;">★</div><h3 style="font-size:15px;font-weight:700;">Varios consorcios <span style="font-size:11px;color:#5a4a8a;font-weight:800;">NUEVO v7.5</span></h3></div>
+    <div style="font-size:13.5px;line-height:1.6;color:var(--ink);">
+    • <b>Módulos opcionales</b> (Depósitos de bancas y Libreta de Clientes): solo aparecen en un consorcio si el súper administrador los activa en Ajustes → <b>Súper administrador</b>. Ni el administrador del consorcio puede activarlos.<br>
+    • <b>Claves maestras</b>: cada consorcio tiene la suya, que crea su administrador en Ajustes → Clave maestra (solo él la sabe). La clave del súper administrador abre en todos los consorcios; su uso queda en la Bitácora como "Clave súper".<br>
+    • Si un administrador olvida su clave, el súper administrador puede <b>Restablecerla</b> y él crea una nueva.</div>
+  </div>
+
+  <div class="panel" style="background:linear-gradient(135deg,#fdf4ec,#f8e6d5);border-color:#e8c7a5;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><div style="width:30px;height:30px;border-radius:9px;background:#3a2a12;color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;">↗</div><h3 style="font-size:15px;font-weight:700;">Rentabilidad y Bitácora <span style="font-size:11px;color:#a37416;font-weight:800;">NUEVO v7.4</span></h3></div>
+    <div style="font-size:13.5px;line-height:1.6;color:var(--ink);">
+    • <b>Análisis → Ingresos según</b>: por defecto usa el <b>Cuadre Mensual</b> (Balance de bancas + Máquinas neto + tu parte de Virtuales), que es tu resultado oficial por banca y tiene datos desde enero. También puedes verlo según los movimientos diarios (desde junio).<br>
+    • <b>Depósitos</b>: con el Cuadre Mensual no se suman, porque el Balance de bancas ya es lo real (venta menos premios). Solo al ver "Movimientos diarios" aparece la casilla para sumarlos, porque ahí vienen restados.<br>
+    • <b>Ficha de banca</b>: en "Rentabilidad por banca", toca una banca. Ves mes a mes sus ingresos por renglón, gastos, resultado y margen, su mejor y peor mes, y en qué se le va el dinero. Los meses sin gastos cargados se marcan "sin gastos".<br>
+    • <b>Bitácora</b>: además de tipo y acción, filtra por <b>usuario</b>, <b>banca</b> y <b>fechas</b>. Ahora incluye depósitos, arqueos, nómina, incentivos, mantenimientos y cada uso de la clave maestra. El botón <b>CSV</b> baja lo filtrado.</div>
+  </div>
+
+  <div class="panel" style="background:linear-gradient(135deg,#f1f0fa,#e6e3f5);border-color:#d3cdee;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><div style="width:30px;height:30px;border-radius:9px;background:#2a2440;color:#b9a5e8;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;">▣</div><h3 style="font-size:15px;font-weight:700;">Uso diario <span style="font-size:11px;color:#5a4a8a;font-weight:800;">NUEVO v7.3</span></h3></div>
+    <div style="font-size:13.5px;line-height:1.6;color:var(--ink);">
+    • <b>Arriba del Inicio</b>, cuatro cifras: <b>Recogido hoy</b>, <b>Pendiente en bancas</b>, <b>Deportiva del mes</b> (real, con depósitos) y <b>Gastos del mes</b>. Toca una para ir a su pantalla.<br>
+    • <b>En la computadora</b> la app se centra y el Inicio se divide en dos columnas: a la izquierda los módulos, a la derecha las cifras y tablas. El Corte Diario muestra las bancas en dos columnas. En el celular todo sigue igual.<br>
+    • <b>Varios consorcios</b>: si tu usuario tiene acceso a más de uno, arriba aparece su nombre con ▾. Tócalo para cambiar; la app se recarga con los datos y permisos de ese consorcio.<br>
+    • <b>Libreta de Clientes</b>: basta con dar el permiso <b>Libreta de Clientes</b> en Ajustes → Usuarios (Ver = solo lectura, Ver y editar = editor). El administrador de PRIME SPORT entra como administrador. Ya no hace falta agregar a la persona aparte dentro de la Libreta.</div>
+  </div>
+
+  <div class="panel" style="background:linear-gradient(135deg,#eef6fb,#e3f0f7);border-color:#cfe3ee;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><div style="width:30px;height:30px;border-radius:9px;background:var(--cerulean-dim);color:var(--cerulean-bright);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;">⛁</div><h3 style="font-size:15px;font-weight:700;">Respaldos y datos confiables <span style="font-size:11px;color:var(--cerulean);font-weight:800;">NUEVO v7.2</span></h3></div>
+    <div style="font-size:13.5px;line-height:1.6;color:var(--ink);">
+    • <b>Respaldo completo</b> (administrador): Ajustes → <b>Respaldo completo</b> → Descargar. Baja un Excel con todas las tablas, incluida la Libreta. <b>Guárdalo fuera del teléfono</b> (correo, Drive o una memoria). Si pasan más de 7 días sin descargarlo, el Inicio te lo recuerda.<br>
+    • <b>Copia automática</b>: la base guarda sola una copia de todo cada domingo a las 3 AM y conserva las últimas 8 semanas, para recuperar datos si algo se borra por error.<br>
+    • <b>Doble registro</b>: si el mismo movimiento (misma banca, fecha, tipo y monto) se guarda dos veces en menos de 20 segundos, la base rechaza el segundo y te avisa.<br>
+    • <b>Montos</b>: un gasto o una salida debe ser mayor que cero; montos de más de 10 millones se rechazan.<br>
+    • <b>Errores de la app</b> (administrador): si algo falla en cualquier teléfono queda anotado. El Inicio avisa, y en Ajustes → <b>Errores de la app</b> ves qué pasó, a quién y en qué pantalla.</div>
+  </div>
+
+  <div class="panel" style="background:linear-gradient(135deg,#eef7f2,#dff0e7);border-color:#c8e2d5;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><div style="width:30px;height:30px;border-radius:9px;background:var(--green-dim);color:#4cd6a0;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;">$</div><h3 style="font-size:15px;font-weight:700;">Depósitos de bancas <span style="font-size:11px;color:var(--green);font-weight:800;">NUEVO v7.0</span></h3></div>
+    <div style="font-size:13.5px;line-height:1.6;color:var(--ink);">Cuando una banca deposita dinero al banco, ese depósito <b>ya viene restado</b> en el balance de Deportiva que se inserta. Por eso la Deportiva puede salir en rojo aunque no lo esté. Aquí se anota aparte para ver la <b>Deportiva real</b>.<br><br>
+    • <b>Registrar</b>: elige si el depósito cubre <b>un día</b> o <b>un período</b> (desde–hasta, un solo monto), la <b>banca</b>, el <b>banco</b> (con <b>+ Otro banco</b> agregas uno nuevo), el <b>monto</b> y, si quieres, la referencia del volante. Usa la misma fecha con que se registró la Deportiva de ese día. Al guardar salta a la próxima banca.<br>
+    • <b>Soporte</b>: con <b>Tomar foto</b> fotografías el volante; con <b>Foto o PDF</b> eliges un archivo (hasta 10 MB). Se puede agregar después abriendo el depósito. En la lista, 📎 abre el soporte y "sin soporte" marca los que faltan.<br>
+    • <b>Corregir o borrar</b>: toca un depósito de la lista para editarlo o borrarlo. Si repites uno igual (misma banca, banco, monto y fechas), te pregunta antes.<br>
+    • <b>Resumen</b>: cuánto depositó cada banca y en qué banco, por mes, semana o fechas que elijas. Toca una banca para ver cada depósito. Se puede exportar a CSV.<br>
+    • <b>En el Inicio</b>: la tarjeta grande muestra <b>+ Depósitos de bancas</b> y el <b>Balance real de bancas</b>; en "Ingresos por categoría" la Deportiva sale como <b>Deportiva real</b> (sistema + depósitos), y la tabla <b>Deportiva por banca</b> lo desglosa.<br><br>
+    <b>Importante:</b> los depósitos <b>no cambian</b> el Corte Diario, el pendiente de las bancas ni el <b>Balance Neto del Mes</b> (que sigue igual al Cierre de Mes). Un período cuenta en el mes de su fecha final y no puede cruzar de un mes a otro: si pasa, regístralo en dos partes. Se necesita el permiso <b>Depósitos de bancas</b> (Ajustes → Usuarios).</div>
   </div>
 
   <div class="panel">
@@ -1903,6 +2000,53 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
   <iframe id="libretaFrame" title="Libreta de Clientes" style="width:100%;height:calc(100dvh - 170px);min-height:480px;border:0;border-radius:14px;background:var(--paper);display:block;"></iframe>
 </section>
 
+<section class="view" id="view-super">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <button onclick="go('settings')" style="border:none;background:#eef2f4;width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;color:var(--navy);flex-shrink:0;">‹</button>
+    <div style="flex:1;"><div style="font-size:17px;font-weight:800;">Súper administrador</div><div style="font-size:12px;color:var(--muted);">Qué módulos tiene cada consorcio y sus claves</div></div>
+  </div>
+  <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Los módulos opcionales solo aparecen en un consorcio si los activas aquí; ni su administrador puede activarlos. Tu clave maestra (la de PRIME SPORT) abre en todos los consorcios; cada dueño crea la suya.</div>
+  <div id="superLista"></div>
+</section>
+
+<section class="view" id="view-errores">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <button onclick="go('settings')" style="border:none;background:#eef2f4;width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;color:var(--navy);flex-shrink:0;">‹</button>
+    <div style="flex:1;"><div style="font-size:17px;font-weight:800;">Errores de la app</div><div style="font-size:12px;color:var(--muted);">Lo que falló en los últimos 7 días, en cualquier teléfono</div></div>
+  </div>
+  <div id="errLista"></div>
+</section>
+
+<section class="view" id="view-clave">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <button onclick="go('settings')" style="border:none;background:#eef2f4;width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;color:var(--navy);flex-shrink:0;">‹</button>
+    <div style="flex:1;"><div style="font-size:17px;font-weight:800;">Clave maestra</div><div style="font-size:12px;color:var(--muted);">Se guarda cifrada en el servidor</div></div>
+  </div>
+  <div id="ckAviso" class="panel" style="display:none;background:#fdf6e8;border-color:#ecd9ac;font-size:13px;line-height:1.5;color:#7a5410;"><b>Cambia la clave ahora.</b> La clave anterior estuvo visible en el código público, así que hay que reemplazarla por una nueva que solo sepas tú.</div>
+  <div class="panel" style="display:flex;flex-direction:column;gap:12px;">
+    <div id="ckActualBox"><label class="lbl" for="ckActual" style="display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">Clave actual</label><input type="password" id="ckActual" autocomplete="current-password"></div>
+    <div><label for="ckNueva" style="display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">Clave nueva (mínimo 8 caracteres)</label><input type="password" id="ckNueva" autocomplete="new-password"></div>
+    <div><label for="ckRepite" style="display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">Repite la clave nueva</label><input type="password" id="ckRepite" autocomplete="new-password"></div>
+    <button class="btn-primary" id="btnGuardarClave" onclick="guardarClaveMaestra()">Cambiar clave</button>
+    <div style="font-size:11.5px;color:var(--muted);line-height:1.5;">La clave no se guarda en el teléfono ni en el código: solo su versión cifrada en Supabase. Si se escribe mal 5 veces seguidas, se bloquea 15 minutos. Cada intento queda en la Bitácora.</div>
+    <div id="ckSuperNota" style="display:none;font-size:11.5px;line-height:1.5;background:#eef6fb;border:1px solid #cfe3ee;border-radius:10px;padding:9px 11px;color:#006a8a;"><b>Esta es la clave súper.</b> Además de este consorcio, abre en todos los demás, aunque cada uno tenga su propia clave.</div>
+  </div>
+</section>
+
+<section class="view" id="view-depositos">
+  <style>
+    .dep-lbl{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;}
+    .dep-nota{font-size:11.5px;color:var(--muted);line-height:1.45;}
+    .dep-btn2{border:1.5px dashed #b9c6ce;background:#fafbfc;border-radius:11px;padding:12px 6px;font-size:13px;font-weight:700;color:#006a8a;cursor:pointer;font-family:inherit;}
+  </style>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+    <button onclick="go('dash')" style="border:none;background:#eef2f4;width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;color:var(--navy);flex-shrink:0;">‹</button>
+    <div style="flex:1;"><div style="font-size:17px;font-weight:800;">Depósitos de bancas</div><div style="font-size:12px;color:var(--muted);">Lo que las bancas depositan al banco</div></div>
+  </div>
+  <div id="depTabs" style="display:flex;gap:4px;background:#e9eef1;border-radius:11px;padding:4px;margin-bottom:14px;"></div>
+  <div id="depBody"></div>
+</section>
+
 <section class="view" id="view-analisis">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
     <button onclick="go('dash')" style="border:none;background:#eef2f4;width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;color:var(--navy);flex-shrink:0;">‹</button>
@@ -1920,15 +2064,27 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
     <div class="fld" style="flex:1;margin:0;"><label style="font-size:11px;">Desde</label><input type="month" id="anDesde" onchange="renderAnalisis()"></div>
     <div class="fld" style="flex:1;margin:0;"><label style="font-size:11px;">Hasta</label><input type="month" id="anHasta" onchange="renderAnalisis()"></div>
   </div>
-  <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:14px;cursor:pointer;">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+    <label for="anFuente" style="font-size:12px;font-weight:700;color:var(--muted);">Ingresos según</label>
+    <select id="anFuente" onchange="renderAnalisis()" style="flex:1;min-width:200px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;font-size:12.5px;font-family:inherit;background:#fff;color:var(--ink);">
+      <option value="cuadre">Cuadre Mensual (oficial, desde enero)</option>
+      <option value="diario">Movimientos diarios (desde junio)</option>
+    </select>
+  </div>
+  <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:6px;cursor:pointer;">
     <input type="checkbox" id="anProrrateo" checked onchange="renderAnalisis()" style="width:16px;height:16px;">
     Cargar a cada banca su parte de los gastos de Administración
+  </label>
+  <label id="anDepositosLbl" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:14px;cursor:pointer;">
+    <input type="checkbox" id="anDepositos" checked onchange="renderAnalisis()" style="width:16px;height:16px;">
+    Sumar los depósitos de bancas al banco (Deportiva real)
   </label>
 
   <div id="anAviso"></div>
   <div id="anHero"></div>
   <div id="anGrafico"></div>
   <div id="anRanking"></div>
+  <div id="anFicha"></div>
   <div id="anMatriz"></div>
   <div id="anRenglones"></div>
   <div id="anGastos"></div>
@@ -1990,15 +2146,36 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
       <option value="virtuales_registros">Virtuales</option>
       <option value="cierres_dia">Cortes diarios</option>
       <option value="cierres_mes">Cierres de mes</option>
+      <option value="depositos_banca">Depósitos de bancas</option>
+      <option value="arqueos_caja">Arqueos de caja</option>
+      <option value="empleados">Empleados</option>
+      <option value="empleado_cuenta">Préstamos y faltantes</option>
+      <option value="nomina_detalle">Nómina</option>
+      <option value="incentivos">Incentivos</option>
+      <option value="mantenimientos">Mantenimientos</option>
+      <option value="clave_maestra">Clave maestra</option>
     </select>
     <select id="bitAccion" onchange="cargarBitacora()" style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:11px;font-size:12.5px;font-family:inherit;background:#fff;color:var(--ink);">
       <option value="">Toda acción</option>
       <option value="INSERT">Creados</option>
       <option value="UPDATE">Cambiados</option>
       <option value="DELETE">Borrados</option>
+      <option value="DESBLOQUEO">Desbloqueos con clave</option>
+      <option value="CLAVE_INCORRECTA">Clave incorrecta</option>
+      <option value="CAMBIO_CLAVE">Cambio de clave</option>
+      <option value="DESBLOQUEO_SUPER">Uso de la clave súper</option>
     </select>
   </div>
-  <div style="font-size:11.5px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Se registran los últimos movimientos, cuadres, cortes y cierres. Los borrados guardan cómo estaba el registro antes de desaparecer.</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+    <select id="bitUsuario" onchange="cargarBitacora()" style="padding:10px 12px;border:1px solid var(--line);border-radius:11px;font-size:12.5px;font-family:inherit;background:#fff;color:var(--ink);"><option value="">Todos los usuarios</option></select>
+    <select id="bitBanca" onchange="cargarBitacora()" style="padding:10px 12px;border:1px solid var(--line);border-radius:11px;font-size:12.5px;font-family:inherit;background:#fff;color:var(--ink);"><option value="">Todas las bancas</option></select>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:10px;align-items:end;">
+    <div><label for="bitDesde" style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;">Desde</label><input type="date" id="bitDesde" onchange="cargarBitacora()" style="padding:9px 10px;font-size:13px;"></div>
+    <div><label for="bitHasta" style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;">Hasta</label><input type="date" id="bitHasta" onchange="cargarBitacora()" style="padding:9px 10px;font-size:13px;"></div>
+    <button id="btnBitCsv" onclick="exportarBitacoraCSV()" style="border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:11px;padding:11px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">CSV</button>
+  </div>
+  <div style="font-size:11.5px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Se registra cada movimiento, cuadre, corte, cierre, depósito, nómina y uso de la clave maestra. Los borrados guardan cómo estaba el registro antes de desaparecer. Filtra por usuario, banca o fechas, y baja lo filtrado con CSV.</div>
   <div id="bitLista"></div>
   <button id="bitMas" onclick="cargarBitacora(true)" style="display:none;width:100%;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:11px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin:12px 0 24px;">Ver más</button>
 </section>
@@ -2025,6 +2202,21 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
     <div class="set-item" id="setItemRevision" onclick="openRevision()" style="cursor:pointer;">
       <div class="si-ic" style="background:var(--green-dim);color:#4cd6a0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
       <div class="si-txt"><div class="t">Revisión semanal</div><div class="d">Arqueo de caja y chequeo de transacciones</div></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" style="width:18px;height:18px;"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    <div class="set-item" id="setItemSuper" onclick="openSuperAdmin()" style="cursor:pointer;display:none;">
+      <div class="si-ic" style="background:#2a2440;color:#b9a5e8;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3L12 16.8 6.5 19.5l1-6.3L3 8.9 9 8z"/></svg></div>
+      <div class="si-txt"><div class="t">Súper administrador</div><div class="d">Módulos por consorcio y claves maestras</div></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" style="width:18px;height:18px;"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    <div class="set-item" id="setItemClave" onclick="openClaveMaestra()" style="cursor:pointer;display:none;">
+      <div class="si-ic" style="background:#3a2a12;color:var(--gold);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+      <div class="si-txt"><div class="t">Clave maestra</div><div class="d">Para reabrir cortes, meses y lecturas maestras</div></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" style="width:18px;height:18px;"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    <div class="set-item" id="setItemErrores" onclick="openErroresApp()" style="cursor:pointer;display:none;">
+      <div class="si-ic" style="background:var(--red-dim);color:#f08980;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div class="si-txt"><div class="t">Errores de la app</div><div class="d">Fallas registradas en los últimos 7 días</div></div>
       <svg viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" style="width:18px;height:18px;"><polyline points="9 18 15 12 9 6"/></svg>
     </div>
     <div class="set-item" id="setItemBitacora" onclick="openBitacora()" style="cursor:pointer;display:none;">
@@ -2091,8 +2283,8 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
   <div class="set-list">
     <div class="set-item">
       <div class="si-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
-      <div class="si-txt"><div class="t">Respaldar datos</div><div class="d">Descargar copia de seguridad</div></div>
-      <div class="si-act" onclick="backupData()">Exportar</div>
+      <div class="si-txt"><div class="t">Respaldo completo</div><div class="d" id="respaldoDesc">Excel con todas las tablas, guárdalo fuera del teléfono</div></div>
+      <div class="si-act" id="btnRespaldo" onclick="respaldoCompleto()">Descargar</div>
     </div>
     <div class="set-item">
       <div class="si-ic" style="background:var(--cerulean-dim);color:var(--cerulean-bright);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg></div>
@@ -2110,7 +2302,7 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
       <div class="si-act" style="color:var(--amber);" onclick="doLogout()">Salir</div>
     </div>
   </div>
-  <div style="text-align:center;color:var(--muted);font-size:11px;padding:8px 0 20px;"><span class="js-consorcio">—</span> · AdmBca v6.9 nube · Santo Domingo, RD</div>
+  <div style="text-align:center;color:var(--muted);font-size:11px;padding:8px 0 20px;"><span class="js-consorcio">—</span> · AdmBca v7.5 nube · Santo Domingo, RD</div>
 </section>
 
 <!-- NAV -->
@@ -2164,7 +2356,7 @@ window.__PSICON="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTE
 </div><!-- /appRoot -->
 
 <script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.118.0';
 window.__supabase = createClient(
   'https://okrfnucuombayysmdviq.supabase.co',
   'sb_publishable_JlxZdS70vitaGNqvI_4Q-g_OMGnRdrU',
@@ -2173,7 +2365,8 @@ window.__supabase = createClient(
 window.dispatchEvent(new Event('supabase-ready'));
 </script>
 <script>
-/* ===================== AdmBca v6.9 ===================== */
+/* ===================== AdmBca v7.5 ===================== */
+const APP_VERSION='7.5';
 function idConsorcio(){ try{ return (state&&state.consorcio&&state.consorcio.id)||null; }catch(e){ return null; } }
 function nomConsorcio(){ try{ return (state&&state.consorcio&&state.consorcio.nombre)||'AdmBca'; }catch(e){ return 'AdmBca'; } }
 const MONTHS=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -2279,6 +2472,7 @@ function cargarHtml2Canvas(){
 }
 
 function setSyncState(s){ // 'ok' | 'saving' | 'error'
+  if(s==='error' && typeof reportarError==='function') reportarError('Falló un guardado: '+(__ultimoError||'sin detalle'), (document.querySelector('.view.active')||{}).id||'');
   const d=document.getElementById('syncDot');
   if(!d)return;
   d.className='sync-dot'+(s==='saving'?' saving':s==='error'?' error':'');
@@ -2307,6 +2501,11 @@ function txnToDb(t){
 }
 
 // Fetch ALL rows from a table, paginating past Supabase's 1000-row server cap.
+/* v7.1 (seguridad): todo texto que llega de la base pasa por aquí antes de
+   mostrarse. Cambia < y > por ‹ › para que una nota o un nombre nunca pueda
+   meter código en la pantalla de otro usuario. */
+function limpiarTexto(v){ return (typeof v==='string' && /[<>]/.test(v)) ? v.replace(/</g,'‹').replace(/>/g,'›') : v; }
+function limpiarFila(r){ if(r&&typeof r==='object'){ for(const k in r){ const v=r[k]; if(typeof v==='string') r[k]=limpiarTexto(v); } } return r; }
 async function fetchAllRows(table){
   const PAGE=1000;
   let all=[], from=0;
@@ -2314,7 +2513,7 @@ async function fetchAllRows(table){
     const {data,error}=await sb.from(table).select('*').range(from,from+PAGE-1);
     if(error) throw error;
     if(!data || !data.length) break;
-    all=all.concat(data);
+    all=all.concat(data.map(limpiarFila));
     if(data.length<PAGE) break;   // last page
     from+=PAGE;
     if(from>100000) break;        // hard safety stop
@@ -2333,7 +2532,7 @@ async function fetchAllSafe(table,orden){
     const {data,error}=await q.range(from,from+PAGE-1);
     if(error) return {data:[],error};
     if(!data||!data.length) break;
-    all=all.concat(data);
+    all=all.concat(data.map(limpiarFila));
     if(data.length<PAGE) break;
     from+=PAGE;
     if(from>200000) break;
@@ -2512,6 +2711,18 @@ async function loadResto(){
       costo:Number(x.costo)||0,proximo:x.proximo||''}));
     state._equiposReady=!eq.error&&!mt.error;
   }catch(e){ console.warn('empleados/equipos',e); state._empReady=false; state._equiposReady=false; }
+
+  // Depósitos de bancas (v7.0) — resiliente
+  try{
+    const [dp,bk]=await Promise.all([fetchAllSafe('depositos_banca','fecha_hasta'),fetchAllSafe('bancos_deposito','orden')]);
+    state.depositos=dp.error?[]:dp.data.map(depDesdeFila);
+    state.bancosDep=bk.error?[]:bk.data.map(b=>({_id:b.id,nombre:b.nombre,activo:b.activo!==false,orden:Number(b.orden)||0}));
+    state._depReady=!dp.error;
+  }catch(e){ console.warn('depositos',e); state.depositos=[]; state.bancosDep=[]; state._depReady=false; }
+
+  cargarEstadoClave();
+  cargarErroresRecientes();
+  chequearVersion();
 
   state._restoListo=true;
   const av=document.getElementById('avisoCargando'); if(av) av.style.display='none';
@@ -2793,6 +3004,17 @@ function renderDash(){
   document.getElementById('heroExp').textContent='RD$'+fmt(c.exp);
   document.getElementById('heroOut').textContent='RD$'+fmt(c.salidasNetas);
   document.getElementById('heroInc').textContent='RD$'+fmt(c.inc);
+  // v7.0: depósitos de bancas (ya restados en la Deportiva insertada). Solo informativo:
+  // el Balance Neto del Mes de arriba NO cambia, para que siga igual al Cierre de Mes.
+  const depM=depositosMes(curYear,curMonth), depTot=depM.reduce((s,x)=>s+x.monto,0);
+  const hd=document.getElementById('heroDep');
+  if(hd){
+    if(depTot>0){
+      hd.style.display='block';
+      hd.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><span style="color:rgba(255,255,255,.62);font-size:11.5px;font-weight:600;">+ Depósitos de bancas al banco</span><span style="color:#7ce6b3;font-size:13px;font-weight:800;">RD$${fmt(depTot)}</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:5px;padding-top:6px;border-top:1px solid rgba(255,255,255,.13);"><span style="color:#fff;font-size:12px;font-weight:800;">Balance real de bancas</span><span style="color:#fff;font-size:14px;font-weight:800;">RD$${fmt(c.inc+depTot)}</span></div>`;
+    } else { hd.style.display='none'; hd.innerHTML=''; }
+  }
 
   // comparación con el mes anterior
   const pm=curMonth===0?11:curMonth-1, pa=curMonth===0?curYear-1:curYear;
@@ -2822,7 +3044,30 @@ function renderDash(){
 
   renderAlertas();
   renderFundList();
-  renderCatBreakdown(txns,c.inc);
+  renderCatBreakdown(txns,c.inc,depM);
+  renderDepInicio(txns,depM);
+  renderHoy(c,txns,depM);
+}
+
+/* v7.3: las 4 cifras que se miran primero, arriba del Inicio */
+function renderHoy(c,txns,depM){
+  const el=document.getElementById('hoyStrip'); if(!el) return;
+  const hoy=todayISO();
+  const recogidoHoy=state.txns.filter(t=>t.type==='collect'&&t.date===hoy).reduce((s,t)=>s+(t.moved||0),0);
+  const bancas=state.branches.filter(b=>!b.isOffice&&b.activa!==false);
+  let pend=0, nPend=0; bancas.forEach(b=>{ const v=bankPending(b.name); if(Math.abs(v)>=1){ pend+=v; nPend++; } });
+  const depTot=(depM||[]).reduce((s,x)=>s+x.monto,0);
+  const deporSis=txns.filter(t=>t.type==='income'&&t.category==='Deportiva').reduce((s,t)=>s+t.amount,0);
+  const deporReal=deporSis+depTot;
+  const tile=(t,v,sub,color,go)=>`<div ${go?`onclick="${go}" `:''}style="background:#fff;border:1px solid #e8edf0;border-radius:13px;padding:11px 12px;box-shadow:var(--shadow);${go?'cursor:pointer;':''}min-width:0;">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);">${t}</div>
+      <div style="font-size:16.5px;font-weight:800;letter-spacing:-.3px;margin-top:2px;color:${color||'var(--ink)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v}</div>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sub}</div></div>`;
+  el.innerHTML =
+    tile('Recogido hoy','RD$'+fmt(recogidoHoy),'lo que entró hoy por mensajero',null,puedeVer('corte')?'openCorte()':'') +
+    tile('Pendiente en bancas','RD$'+fmt(pend),nPend?`${nPend} banca${nPend===1?'':'s'} con saldo`:'todo recogido',pend>0?'var(--amber)':(pend<0?'var(--red)':'var(--green)'),puedeVer('corte')?'openCorte()':'') +
+    tile('Deportiva del mes','RD$'+fmt(deporReal),depTot>0?'real (sistema + depósitos)':'según el sistema',deporReal<0?'var(--red)':'var(--green)',puedeVer('depositos')?'openDepositos()':'') +
+    tile('Gastos del mes','RD$'+fmt(c.exp),`${MONTHS_SHORT[curMonth]} ${curYear}`,null,'');
 }
 
 /* ---------- B5: avisos del inicio ---------- */
@@ -2874,6 +3119,20 @@ function renderAlertas(){
     else if(pend.length) avisos.push({c:'#0086AD',bg:'#eef6fb',bd:'#cfe3ee',t:`${pend.length} incentivo(s) sin pagar`,d:`RD$${fmt(pend.reduce((s,x)=>s+x.monto,0))} de ${MONTHS[m-1]} · genera el archivo del banco`,go:'openIncentivos()'});
   }
 
+  // v7.2: respaldo semanal y errores de la app (solo administrador)
+  if(esAdmin() && state._configReady){
+    const ds=diasSinRespaldo();
+    if(ds===null||ds>7) avisos.push({c:'#0b6b4f',bg:'#eef7f2',bd:'#c8e2d5',t:ds===null?'Descarga tu primer respaldo completo':`Hace ${ds} días que no descargas el respaldo`,d:'Ajustes → Respaldo completo. Guárdalo fuera del teléfono.',go:"go('settings')"});
+  }
+  if(esAdmin() && (state.erroresApp||[]).length){
+    const n=state.erroresApp.length;
+    avisos.push({c:'#b23b31',bg:'#fdf1ef',bd:'#f0c9c4',t:`${n} error${n===1?'':'es'} de la app esta semana`,d:state.erroresApp[0].mensaje,go:'openErroresApp()'});
+  }
+  // v7.1: la clave maestra vieja estuvo en el código público
+  if(esAdmin() && state.claveEstado && state.claveEstado.existe===false)
+    avisos.unshift({c:'#a3651a',bg:'#fdf6e8',bd:'#ecd9ac',t:'Crea tu clave maestra',d:'Sirve para reabrir cortes y meses. Solo tú la sabrás.',go:'openClaveMaestra()'});
+  if(esAdmin() && state.claveEstado && state.claveEstado.debe_cambiar)
+    avisos.unshift({c:'#a3651a',bg:'#fdf6e8',bd:'#ecd9ac',t:'Cambia la clave maestra',d:'La clave anterior estuvo visible en el código. Toca aquí para poner una nueva.',go:'openClaveMaestra()'});
   if(!avisos.length){ el.innerHTML=''; return; }
   el.innerHTML='<div style="margin-bottom:16px;display:flex;flex-direction:column;gap:8px;">'+avisos.map(a=>`
     <div onclick="${a.go}" style="background:${a.bg};border:1px solid ${a.bd};border-radius:12px;padding:11px 13px;cursor:pointer;display:flex;align-items:center;gap:11px;">
@@ -2899,9 +3158,13 @@ function renderFundList(){
     </div>`).join('');
 }
 
-function renderCatBreakdown(txns,totalInc){
+function renderCatBreakdown(txns,totalInc,depM){
   const incomes=txns.filter(t=>t.type==='income');
   const byCat={}; incomes.forEach(t=>byCat[t.category]=(byCat[t.category]||0)+t.amount);
+  // v7.0: la Deportiva se muestra real = sistema + depósitos de bancas al banco
+  const depTot=(depM||[]).reduce((s,x)=>s+x.monto,0);
+  const depSis=byCat['Deportiva']||0;
+  if(depTot>0){ byCat['Deportiva']=depSis+depTot; totalInc+=depTot; }
   const el=document.getElementById('catBreakdown');
   document.getElementById('catTotal').textContent='RD$'+fmt(totalInc);
   const entries=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
@@ -2912,7 +3175,8 @@ function renderCatBreakdown(txns,totalInc){
     let pct=totalInc>0?(amt/totalInc*100):0;
     if(pct<0)pct=0; if(pct>100)pct=100;
     const amtColor=amt<0?'var(--red)':'inherit';
-    return `<div class="cat-row"><div class="top"><div class="nm"><span class="cat-dot" style="background:${amt<0?'var(--red)':color}"></span>${cat}</div><div class="amt" style="color:${amtColor}">RD$${fmt(amt)}</div></div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${amt<0?'var(--red)':color}"></div></div></div>`;
+    const real=cat==='Deportiva'&&depTot>0;
+    return `<div class="cat-row"><div class="top"><div class="nm"><span class="cat-dot" style="background:${amt<0?'var(--red)':color}"></span>${real?'Deportiva real':cat}</div><div class="amt" style="color:${amtColor}">RD$${fmt(amt)}</div></div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${amt<0?'var(--red)':color}"></div></div>${real?`<div style="font-size:11.5px;color:var(--muted);margin-top:5px;">Sistema <b style="color:${depSis<0?'var(--red)':'var(--ink)'}">RD$${fmt(depSis)}</b> + depósitos al banco <b style="color:var(--ink)">RD$${fmt(depTot)}</b></div>`:''}</div>`;
   }).join('');
 }
 
@@ -4134,6 +4398,535 @@ function enviarNominaWhatsApp(){
   window.open('https://wa.me/'+corteWaNumber()+'?text='+encodeURIComponent(t),'_blank');
 }
 
+/* ===================== SÚPER ADMINISTRADOR (v7.5) ===================== */
+const NOMBRE_OPCIONAL={depositos:'Depósitos de bancas',libreta:'Libreta de Clientes'};
+async function openSuperAdmin(){
+  if(!esSuper()){ toast('Solo el súper administrador.',false); return; }
+  showOnlyView('view-super');
+  const el=document.getElementById('superLista'); el.innerHTML='<div class="empty-hint" style="padding:24px;">Cargando…</div>';
+  try{
+    const {data,error}=await sb.rpc('consorcios_super'); if(error) throw error;
+    el.innerHTML=(data||[]).map(c=>{ const m=c.modulos_activos||{};
+      return `<div class="panel" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;">
+          <div style="font-size:15px;font-weight:800;">${escD(c.nombre)}</div>
+          <div style="font-size:11px;color:var(--muted);">${c.usuarios} usuario(s)</div></div>
+        ${MODULOS_OPCIONALES.map(k=>`<label style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer;">
+            <span style="font-size:13px;font-weight:600;">${NOMBRE_OPCIONAL[k]}</span>
+            <input type="checkbox" ${m[k]?'checked':''} data-con="${c.id}" data-modulo="${k}" onchange="superModulo(this)" style="width:20px;height:20px;"></label>`).join('')}
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding-top:9px;border-top:1px solid var(--line);">
+          <span style="font-size:12.5px;color:var(--muted);">Clave maestra: <b style="color:${c.tiene_clave?'var(--green)':'#a3651a'};">${c.tiene_clave?'creada':'sin crear'}</b>${c.codigo==='PRIMESPORT'?' · es la súper':''}</span>
+          ${c.codigo!=='PRIMESPORT'&&c.tiene_clave?`<button data-con="${c.id}" data-nom="${escD(c.nombre)}" onclick="superRestablecer(this)" style="border:1px solid #e9b3ad;background:#fff;color:var(--red);border-radius:9px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">Restablecer</button>`:''}
+        </div></div>`; }).join('') || '<div class="empty-hint">Sin consorcios.</div>';
+  }catch(e){ console.error(e); el.innerHTML='<div class="empty-hint" style="padding:24px;">No se pudo cargar.</div>'; }
+}
+async function superModulo(chk){
+  const con=chk.getAttribute('data-con'), mod=chk.getAttribute('data-modulo'), on=chk.checked;
+  chk.disabled=true;
+  try{
+    const {data,error}=await sb.rpc('fijar_modulo',{p_consorcio:con,p_modulo:mod,p_activo:on});
+    if(error||data!=='OK') throw error||new Error(data);
+    if(state.consorcio&&state.consorcio.id===con){ state.consorcio.modulos=Object.assign({},state.consorcio.modulos,{[mod]:on}); aplicarPermisos(); }
+    toast(`${NOMBRE_OPCIONAL[mod]} ${on?'activado':'desactivado'}`,true);
+  }catch(e){ console.error(e); chk.checked=!on; toast('No se pudo cambiar el módulo.',false); }
+  finally{ chk.disabled=false; }
+}
+async function superRestablecer(btn){
+  const con=btn.getAttribute('data-con'), nom=btn.getAttribute('data-nom');
+  if(!confirm(`¿Restablecer la clave maestra de ${nom}?\n\nSu clave actual dejará de servir y su administrador tendrá que crear una nueva. Tu clave súper sigue abriendo.`)) return;
+  try{
+    const {data,error}=await sb.rpc('restablecer_clave_consorcio',{p_consorcio:con});
+    if(error||data!=='OK') throw error||new Error(data);
+    toast('Clave restablecida',true); openSuperAdmin();
+  }catch(e){ console.error(e); toast('No se pudo restablecer.',false); }
+}
+
+/* ===================== RESPALDO COMPLETO (v7.2) =====================
+   Supabase en plan gratuito no guarda copias restaurables. Este botón baja un
+   Excel con TODAS las tablas del consorcio (una hoja por tabla, datos tal cual
+   están en la base). La base además guarda sola una copia interna cada domingo
+   (8 semanas). Si pasan más de 7 días sin descargar, el Inicio lo recuerda. */
+const TABLAS_RESPALDO=['movimientos','sucursales','cierres_dia','cierres_mes','desglose_efectivo','denominaciones','arqueos_caja',
+  'categorias_gasto','categorias_ingreso','categorias_salida','tipos_aporte','cuadre_banca_ingreso','cuadre_banca_gasto','cuadre_oficina_gasto',
+  'maquinas','lecturas_maquina','maquinas_config_banca','maquinas_gastos_mes','maquinas_pog_mes',
+  'virtuales_proveedores','virtuales_config','virtuales_registros','virtuales_sucursales_estado','virtuales_renglones_estado',
+  'empleados','empleado_cuenta','nomina_periodos','nomina_detalle','incentivos','regalia','equipos','mantenimientos',
+  'depositos_banca','bancos_deposito','app_config','libreta_clientes','libreta_movimientos','libreta_ajustes','libreta_miembros'];
+function cargarScript(src){ return new Promise((ok,no)=>{ if([...document.scripts].some(x=>x.src===src)) return ok(); const sc=document.createElement('script'); sc.src=src; sc.onload=ok; sc.onerror=()=>no(new Error('no se pudo cargar '+src)); document.head.appendChild(sc); }); }
+async function filasCrudas(table){
+  const PAGE=1000; let all=[], from=0;
+  while(true){
+    const {data,error}=await sb.from(table).select('*').range(from,from+PAGE-1);
+    if(error) return {data:[],error};
+    if(!data||!data.length) break;
+    all=all.concat(data); if(data.length<PAGE) break; from+=PAGE; if(from>500000) break;
+  }
+  return {data:all,error:null};
+}
+async function respaldoCompleto(){
+  if(!esAdmin()){ toast('Solo el administrador puede descargar el respaldo completo.',false); return; }
+  return conBloqueo('btnRespaldo', async()=>{
+    try{
+      setSyncState('saving');
+      if(!window.XLSX) await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+      const wb=XLSX.utils.book_new(); const resumen=[['Tabla','Filas','Estado']]; let total=0;
+      for(const t of TABLAS_RESPALDO){
+        const r=await filasCrudas(t);
+        if(r.error){ resumen.push([t,0,'sin acceso o no existe']); continue; }
+        const filas=r.data.map(row=>{ const o={}; for(const k in row){ const v=row[k]; let x=(v!==null&&typeof v==='object')?JSON.stringify(v):v; if(typeof x==='string'&&x.length>32000) x=x.slice(0,32000)+'…'; o[k]=x; } return o; });
+        const ws=filas.length?XLSX.utils.json_to_sheet(filas):XLSX.utils.aoa_to_sheet([['(vacía)']]);
+        XLSX.utils.book_append_sheet(wb,ws,t.slice(0,31));
+        resumen.push([t,filas.length,'ok']); total+=filas.length;
+      }
+      const ahora=new Date();
+      resumen.unshift(['Respaldo AdmBca v'+APP_VERSION,nomConsorcio(),ahora.toLocaleString('es-DO')],[]);
+      resumen.push([],['TOTAL',total,'']);
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(resumen),'RESUMEN');
+      wb.SheetNames.unshift(wb.SheetNames.pop());
+      const nombre=`Respaldo_${nomConsorcio().replace(/[^A-Za-z0-9]+/g,'_')}_${isoLocal(ahora)}.xlsx`;
+      XLSX.writeFile(wb,nombre);
+      try{ await sb.from('app_config').upsert({consorcio_id:idConsorcio(),clave:'ultimo_respaldo',valor:ahora.toISOString(),actualizado:ahora.toISOString()},{onConflict:'consorcio_id,clave'}); }catch(e){}
+      state.config=state.config||{}; state.config.ultimo_respaldo=ahora.toISOString();
+      setSyncState('ok'); toast(`Respaldo descargado: ${total.toLocaleString('es-DO')} filas. Guárdalo fuera del teléfono (correo, Drive o USB).`,true);
+      pintarRespaldoDesc(); try{ renderAlertas(); }catch(e){}
+    }catch(e){ console.error(e); setSyncState('error'); toast('No se pudo generar el respaldo: '+(e.message||''),false); }
+  });
+}
+function diasSinRespaldo(){ const u=state.config&&state.config.ultimo_respaldo; if(!u) return null; return Math.floor((Date.now()-new Date(u).getTime())/86400000); }
+function pintarRespaldoDesc(){ const el=document.getElementById('respaldoDesc'); if(!el) return; const d=diasSinRespaldo(); el.textContent = d===null ? 'Excel con todas las tablas · nunca descargado' : `Excel con todas las tablas · último hace ${d} día${d===1?'':'s'}`; }
+
+/* ===================== REGISTRO DE ERRORES (v7.2) =====================
+   Si algo falla en cualquier teléfono, queda anotado en la base (tabla
+   errores_app) y el administrador lo ve en el Inicio y en Ajustes. */
+var __errEnviados=0, __errVistos={}, __ultimoError='';
+const __consoleError=console.error.bind(console);
+console.error=function(...a){ try{ __ultimoError=a.map(x=>x&&x.message?x.message:(typeof x==='string'?x:JSON.stringify(x))).join(' ').slice(0,600); }catch(e){} __consoleError(...a); };
+async function reportarError(mensaje,detalle){
+  try{
+    if(!sb||!currentUser) return;
+    const m=String(mensaje||'').slice(0,900); if(!m) return;
+    if(__errVistos[m]||__errEnviados>=15) return; __errVistos[m]=1; __errEnviados++;
+    const pant=(document.querySelector('.view.active')||{}).id||'';
+    await sb.from('errores_app').insert({mensaje:m,detalle:String(detalle||'').slice(0,3500),version:APP_VERSION,pantalla:pant,correo:currentUser,navegador:navigator.userAgent.slice(0,200)});
+  }catch(e){}
+}
+window.addEventListener('error',e=>{ if(e&&e.message) reportarError(e.message,(e.filename||'')+':'+(e.lineno||'')+' '+(e.error&&e.error.stack||'')); });
+window.addEventListener('unhandledrejection',e=>{ const r=e&&e.reason; reportarError('Promesa: '+(r&&r.message||String(r)),r&&r.stack||''); });
+async function cargarErroresRecientes(){
+  if(!esAdmin()) return;
+  try{
+    const desde=new Date(Date.now()-7*86400000).toISOString();
+    const {data,error}=await sb.from('errores_app').select('id,creado,correo,version,pantalla,mensaje,detalle').gte('creado',desde).order('creado',{ascending:false}).limit(100);
+    if(!error){ state.erroresApp=(data||[]).map(limpiarFila); try{ renderAlertas(); }catch(e){} }
+  }catch(e){}
+}
+function openErroresApp(){
+  if(!esAdmin()) return;
+  showOnlyView('view-errores');
+  const l=state.erroresApp||[];
+  document.getElementById('errLista').innerHTML = l.length ? l.map(x=>`<div class="panel" style="padding:11px 13px;margin-bottom:8px;">
+      <div style="font-size:12.5px;font-weight:800;color:var(--red);word-break:break-word;">${x.mensaje}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;">${new Date(x.creado).toLocaleString('es-DO')} · ${x.correo||''} · v${x.version||'?'} · ${String(x.pantalla||'').replace('view-','')}</div>
+      ${x.detalle?`<details style="margin-top:6px;font-size:11px;color:var(--muted);"><summary>Detalle técnico</summary><div style="white-space:pre-wrap;word-break:break-word;margin-top:4px;">${x.detalle}</div></details>`:''}
+    </div>`).join('') : '<div class="empty-hint" style="padding:30px;">Sin errores en los últimos 7 días.</div>';
+}
+
+/* ===================== AVISO DE VERSIÓN NUEVA (v7.1) =====================
+   Cada 15 minutos (y al volver a la pestaña) mira qué versión está publicada.
+   Si es distinta de la que está abierta, muestra una franja para actualizar,
+   así nadie se queda trabajando con una versión vieja. */
+let __verUlt=0;
+async function chequearVersion(){
+  if(Date.now()-__verUlt<60000) return; __verUlt=Date.now();
+  try{
+    const r=await fetch(location.pathname.replace(/[^/]*$/,'')+'index.html?nv='+Date.now(),{cache:'no-store'});
+    if(!r.ok) return;
+    const m=(await r.text()).match(/AdmBca v([0-9.]+) nube/);
+    if(!m||m[1]===APP_VERSION||document.getElementById('avisoVersion')) return;
+    const b=document.createElement('div'); b.id='avisoVersion';
+    b.style.cssText='position:fixed;left:12px;right:12px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:9000;background:var(--navy);color:#fff;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-lg);font-size:13px;';
+    b.innerHTML=`<div style="flex:1;line-height:1.35;"><b>Hay una versión nueva (v${m[1]}).</b><br><span style="color:var(--muted-light);font-size:12px;">Guarda lo que estés haciendo y actualiza.</span></div><button style="border:none;background:var(--cerulean);color:#fff;border-radius:10px;padding:10px 14px;font-weight:700;font-family:inherit;cursor:pointer;">Actualizar</button>`;
+    b.querySelector('button').onclick=()=>{ location.replace(location.pathname+'?v='+m[1]+'&t='+Date.now()); };
+    document.body.appendChild(b);
+  }catch(e){}
+}
+setInterval(()=>{ if(!document.hidden) chequearVersion(); }, 15*60*1000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden && state && state._restoListo) chequearVersion(); });
+
+/* ===================== DEPÓSITOS DE BANCAS (v7.0) =====================
+   Lo que las bancas depositan al banco. Ese dinero YA viene restado en el
+   balance de Deportiva que se inserta, así que aquí solo se anota aparte para
+   mostrar la Deportiva real en el Inicio. NO toca el Corte Diario, el
+   pendiente de las bancas ni el Balance Neto del Mes.
+   Un depósito cubre un día o un período (desde–hasta) y cuenta en el mes de
+   negocio de su fecha final (misma regla que monthDate: el día 1 es del mes
+   anterior). Un período no puede cruzar de un mes de negocio a otro. */
+let depTab='reg', depCur=null, depModo='dia', depBanca='', depBanco='', depArchivo=null;
+let depPer='mes', depRDesde='', depRHasta='', depDetBanca=null, depF1Ult='', depF2Ult='';
+
+function escD(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function psCorto(n){ return String(n||'').replace('PRIME SPORT ','PS '); }
+function depMesDe(fecha){ const d=new Date(monthDate({type:'dep',date:fecha})+'T00:00:00'); return {anio:d.getFullYear(),mes:d.getMonth()}; }
+function depositosMes(anio,mes){ return (state.depositos||[]).filter(x=>{ const m=depMesDe(x.hasta); return m.anio===anio&&m.mes===mes; }); }
+function bancasDep(){ return sortBranchesNum(state.branches.filter(b=>!b.isOffice&&b.activa!==false)); }
+function bancosDepActivos(){ return (state.bancosDep||[]).filter(b=>b.activo).sort((a,b)=>(a.orden-b.orden)||a.nombre.localeCompare(b.nombre,'es')); }
+function depDesdeFila(x){ return {_id:x.id,sucursal:normBranchName(x.sucursal),banco:x.banco,monto:Number(x.monto)||0,desde:x.fecha_desde,hasta:x.fecha_hasta,
+  ref:x.referencia||'',soportePath:x.soporte_path||'',soporteTipo:x.soporte_tipo||'',soporteNombre:x.soporte_nombre||'',creado:x.creado||''}; }
+function depFechaTxt(x){ return x.desde===x.hasta ? fmtDate(x.hasta) : `${fmtDate(x.desde)} – ${fmtDate(x.hasta)}`; }
+
+function openDepositos(){
+  if(!puedeVer('depositos')){ toast('No tienes acceso a esta sección.',false); return; }
+  if(!moduloListo()) return;
+  showOnlyView('view-depositos');
+  if(!puedeEditar('depositos')) depTab='res';
+  depCur=null; depArchivo=null;
+  renderDepositos();
+}
+function setDepTab(t){ depTab=t; depCur=null; depArchivo=null; depDetBanca=null; renderDepositos(); window.scrollTo(0,0); }
+function renderDepositos(){
+  const tabs=[['reg','Registrar'],['res','Resumen']].filter(x=>x[0]!=='reg'||puedeEditar('depositos'));
+  if(!tabs.some(x=>x[0]===depTab)) depTab=tabs[0][0];
+  document.getElementById('depTabs').innerHTML=tabs.map(([k,l])=>`<button type="button" onclick="setDepTab('${k}')" style="flex:1;border:none;border-radius:8px;padding:10px 4px;font-size:13px;font-weight:${depTab===k?800:700};font-family:inherit;cursor:pointer;background:${depTab===k?'#fff':'transparent'};color:${depTab===k?'var(--ink)':'var(--muted)'};box-shadow:${depTab===k?'0 1px 3px rgba(16,24,32,.12)':'none'};">${l}</button>`).join('');
+  if(state._depReady===false){ document.getElementById('depBody').innerHTML='<div class="empty-hint" style="padding:30px;">No se pudieron cargar los depósitos. Revisa tu conexión y vuelve a entrar.</div>'; return; }
+  if(depTab==='reg') renderDepRegistrar(); else renderDepResumen();
+}
+
+/* ---------- Registrar ---------- */
+function renderDepRegistrar(){
+  const e=depCur;
+  if(e){ depModo=e.desde===e.hasta?'dia':'periodo'; depBanca=e.sucursal; depBanco=e.banco; }
+  const f1=e?e.desde:(depF1Ult||yesterdayISO());
+  const f2=e?e.hasta:(depF2Ult||f1);
+  const hoyMes=depMesDe(todayISO());
+  const lista=depositosMes(hoyMes.anio,hoyMes.mes).slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
+  const totalMes=lista.reduce((s,x)=>s+x.monto,0);
+  document.getElementById('depBody').innerHTML=`
+  <div class="panel" style="display:flex;flex-direction:column;gap:15px;">
+    ${e?`<div style="background:#eef6fb;border:1px solid #cfe3ee;border-radius:10px;padding:9px 11px;font-size:12.5px;font-weight:700;color:#006a8a;">Editando el depósito de ${escD(psCorto(e.sucursal))} · ${escD(depFechaTxt(e))}</div>`:''}
+    <div><span class="dep-lbl">El depósito cubre</span><div id="depModoBox" style="display:flex;gap:4px;background:#e9eef1;border-radius:11px;padding:4px;"></div></div>
+    <div id="depFechas" style="display:grid;gap:8px;">
+      <div><label class="dep-lbl" id="depF1Lbl" for="depF1">Fecha</label><input type="date" id="depF1" value="${f1}"></div>
+      <div id="depF2Box"><label class="dep-lbl" for="depF2">Hasta</label><input type="date" id="depF2" value="${f2}"></div>
+    </div>
+    <div id="depFechaNota" class="dep-nota" style="margin-top:-8px;"></div>
+    <div><span class="dep-lbl">Banca</span><div id="depBancaChips" style="display:flex;flex-wrap:wrap;gap:7px;"></div></div>
+    <div><span class="dep-lbl">Banco</span><div id="depBancoChips" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;"></div>
+      <div id="depNuevoBancoBox" style="display:none;gap:8px;margin-top:8px;align-items:center;">
+        <input id="depNuevoBanco" maxlength="40" placeholder="Nombre del banco" style="flex:1;">
+        <button type="button" id="btnAgregarBanco" onclick="agregarBancoDep()" style="border:none;background:var(--navy);color:#fff;border-radius:10px;padding:13px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Agregar</button>
+      </div></div>
+    <div><label class="dep-lbl" for="depMonto">Monto depositado</label><div class="amount-input"><span class="cur">RD$</span><input type="number" inputmode="decimal" step="0.01" min="0" id="depMonto" value="${e?e.monto:''}" placeholder="0.00"></div></div>
+    <div><label class="dep-lbl" for="depRef">Referencia del volante (opcional)</label><input id="depRef" maxlength="80" value="${escD(e?e.ref:'')}" placeholder="No. de transacción o nota"></div>
+    <div><span class="dep-lbl">Soporte del depósito (opcional)</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button type="button" class="dep-btn2" onclick="document.getElementById('depCam').click()">Tomar foto</button>
+        <button type="button" class="dep-btn2" onclick="document.getElementById('depFile').click()">Foto o PDF</button>
+      </div>
+      <input type="file" id="depCam" accept="image/*" capture="environment" style="display:none" onchange="depElegirArchivo(this)">
+      <input type="file" id="depFile" accept="image/*,application/pdf" style="display:none" onchange="depElegirArchivo(this)">
+      <div id="depArchivoBox"></div>
+    </div>
+    <button class="btn-primary" id="btnGuardarDep" onclick="guardarDeposito()">${e?'Guardar cambios':'Guardar y seguir con la próxima banca'}</button>
+    ${e?`<div style="display:flex;gap:8px;">
+      <button type="button" onclick="cancelarEdicionDep()" style="flex:1;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:11px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Cancelar</button>
+      <button type="button" id="btnBorrarDep" onclick="borrarDeposito()" style="flex:1;border:1px solid #f0c9c4;background:#fdf1ef;color:var(--red);border-radius:11px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Borrar depósito</button>
+    </div>`:''}
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Registrados este mes</h3><span class="hint">${lista.length} depósito${lista.length===1?'':'s'}</span></div>
+    ${lista.length?lista.slice(0,40).map(x=>depFilaHTML(x,true)).join('')+`
+      <div style="display:flex;justify-content:space-between;align-items:center;background:#eaf7f0;border-radius:10px;padding:11px 12px;margin-top:8px;">
+        <span style="font-size:13px;font-weight:700;color:#146b49;">Total depositado en el mes</span>
+        <span style="font-size:15px;font-weight:800;color:#146b49;">RD$${fmt(totalMes)}</span></div>`
+      :'<div class="empty-hint" style="padding:18px;">Todavía no hay depósitos este mes.</div>'}
+    ${lista.length>40?`<div style="font-size:11.5px;color:var(--muted);margin-top:6px;">Se muestran los 40 más recientes. El resto está en Resumen.</div>`:''}
+  </div>`;
+  depSetModo(depModo,true);
+  depPintarArchivo();
+}
+function depFilaHTML(x,editable){
+  const sop = x.soportePath
+    ? `<button type="button" onclick="event.stopPropagation();verSoporteDep('${x._id}')" aria-label="Ver soporte" style="border:none;background:none;color:#006a8a;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit;padding:4px;">📎 ${/pdf/.test(x.soporteTipo)?'PDF':'Foto'}</button>`
+    : `<span style="font-size:11px;color:#a3651a;font-weight:700;">sin soporte</span>`;
+  const click = editable&&puedeEditar('depositos') ? `onclick="editarDeposito('${x._id}')" style="cursor:pointer;` : `style="`;
+  return `<div ${click}display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #edf1f3;">
+    <div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;">${escD(psCorto(x.sucursal))} <span style="font-weight:600;color:var(--muted);font-size:12px;">· ${escD(x.banco)}</span></div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">${x.desde===x.hasta?'':'Período '}${escD(depFechaTxt(x))}${x.ref?' · ref. '+escD(x.ref):''}</div></div>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">${sop}<span style="font-size:14px;font-weight:800;">RD$${fmt(x.monto)}</span></div>
+  </div>`;
+}
+function depChipStyle(on){ return `border:1.5px solid ${on?'var(--cerulean)':'#dde4e8'};background:${on?'var(--cerulean)':'#fafbfc'};color:${on?'#fff':'var(--muted)'};border-radius:20px;padding:8px 13px;font-size:13px;font-weight:${on?700:600};cursor:pointer;font-family:inherit;`; }
+function depPintarChips(){
+  const bc=document.getElementById('depBancaChips'); if(!bc) return;
+  bc.innerHTML=bancasDep().map(b=>`<button type="button" data-v="${escD(b.name)}" onclick="depSel('banca',this.dataset.v)" style="${depChipStyle(depBanca===b.name)}">${escD(psCorto(b.name))}</button>`).join('');
+  const bk=bancosDepActivos();
+  if(depBanco && !bk.some(b=>b.nombre===depBanco)) bk.push({nombre:depBanco});
+  document.getElementById('depBancoChips').innerHTML=bk.map(b=>{ const on=depBanco===b.nombre;
+    return `<button type="button" data-v="${escD(b.nombre)}" onclick="depSel('banco',this.dataset.v)" style="border:1.5px solid ${on?'var(--cerulean)':'#dde4e8'};background:${on?'#e6f4f9':'#fafbfc'};color:${on?'#006a8a':'var(--muted)'};border-radius:11px;padding:11px 6px;font-size:13px;font-weight:${on?800:600};cursor:pointer;font-family:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escD(b.nombre)}</button>`; }).join('')
+    + `<button type="button" onclick="depMostrarNuevoBanco()" style="border:1.5px dashed #b9c6ce;background:transparent;color:#006a8a;border-radius:11px;padding:11px 6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">+ Otro banco</button>`;
+}
+function depSel(k,v){ if(k==='banca') depBanca=v; else depBanco=v; depPintarChips(); }
+function depSetModo(m,silencioso){
+  depModo=m;
+  const box=document.getElementById('depModoBox'); if(!box) return;
+  box.innerHTML=[['dia','Un día'],['periodo','Un período']].map(([k,l])=>`<button type="button" onclick="depSetModo('${k}')" style="flex:1;border:none;border-radius:8px;padding:9px 4px;font-size:12.5px;font-weight:${depModo===k?800:700};font-family:inherit;cursor:pointer;background:${depModo===k?'#fff':'transparent'};color:${depModo===k?'var(--ink)':'var(--muted)'};box-shadow:${depModo===k?'0 1px 3px rgba(16,24,32,.12)':'none'};">${l}</button>`).join('');
+  const per=depModo==='periodo';
+  document.getElementById('depF2Box').style.display=per?'':'none';
+  document.getElementById('depFechas').style.gridTemplateColumns=per?'1fr 1fr':'1fr';
+  document.getElementById('depF1Lbl').textContent=per?'Desde':'Fecha';
+  document.getElementById('depFechaNota').innerHTML=per
+    ?'Un solo monto por todo el período. Cuenta en el mes de la fecha final; si el período cruza de un mes a otro, regístralo en dos partes.'
+    :'Usa la misma fecha con que se registró la Deportiva de ese día.';
+  if(per && !silencioso){ const a=document.getElementById('depF1'), b=document.getElementById('depF2'); if(b.value<a.value) b.value=a.value; }
+  depPintarChips();
+}
+function depMostrarNuevoBanco(){ const b=document.getElementById('depNuevoBancoBox'); b.style.display='flex'; document.getElementById('depNuevoBanco').focus(); }
+async function agregarBancoDep(){
+  const inp=document.getElementById('depNuevoBanco'); const nombre=inp.value.trim().replace(/\s+/g,' ');
+  if(!nombre){ toast('Escribe el nombre del banco',false); return; }
+  const ya=(state.bancosDep||[]).find(b=>b.nombre.toLowerCase()===nombre.toLowerCase());
+  if(ya){ depBanco=ya.nombre; if(!ya.activo){ ya.activo=true; sb.from('bancos_deposito').update({activo:true}).eq('id',ya._id).then(()=>{}); } document.getElementById('depNuevoBancoBox').style.display='none'; inp.value=''; depPintarChips(); return; }
+  return conBloqueo('btnAgregarBanco', async()=>{
+    try{
+      const orden=Math.max(0,...(state.bancosDep||[]).map(b=>b.orden||0))+1;
+      const {data,error}=await sb.from('bancos_deposito').insert({nombre,orden}).select();
+      if(error) throw error;
+      state.bancosDep.push({_id:data[0].id,nombre,activo:true,orden});
+      depBanco=nombre; inp.value=''; document.getElementById('depNuevoBancoBox').style.display='none';
+      depPintarChips(); toast('Banco agregado',true);
+    }catch(e){ console.error(e); toast('No se pudo agregar el banco. Revisa tu conexión.',false); }
+  });
+}
+function depElegirArchivo(input){
+  const f=input.files&&input.files[0]; input.value='';
+  if(!f) return;
+  if(!/^image\//.test(f.type) && f.type!=='application/pdf'){ toast('Solo se aceptan fotos o PDF',false); return; }
+  if(f.size>10*1024*1024){ toast('El archivo pasa de 10 MB. Usa uno más liviano.',false); return; }
+  depArchivo=f; depPintarArchivo();
+}
+function depPintarArchivo(){
+  const box=document.getElementById('depArchivoBox'); if(!box) return;
+  const actual=depCur&&depCur.soportePath;
+  if(depArchivo){
+    const pdf=depArchivo.type==='application/pdf';
+    box.innerHTML=`<div style="display:flex;align-items:center;gap:10px;background:#eef6fb;border:1px solid #cfe3ee;border-radius:11px;padding:9px 11px;margin-top:8px;">
+      <div style="width:34px;height:34px;border-radius:8px;background:${pdf?'#d64b3f':'#0086AD'};color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${pdf?'PDF':'FOTO'}</div>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escD(depArchivo.name||'foto.jpg')}</div><div style="font-size:11px;color:var(--muted);">${Math.max(1,Math.round(depArchivo.size/1024))} KB · ${actual?'reemplaza el soporte actual':'se sube al guardar'}</div></div>
+      <button type="button" onclick="depArchivo=null;depPintarArchivo()" aria-label="Quitar archivo" style="border:none;background:none;font-size:18px;color:var(--muted);cursor:pointer;padding:4px 8px;">×</button></div>`;
+  } else if(actual){
+    box.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f4f6f7;border-radius:11px;padding:9px 11px;margin-top:8px;font-size:12.5px;">
+      <span>Tiene soporte: <b>${escD(depCur.soporteNombre||'archivo')}</b></span>
+      <button type="button" onclick="verSoporteDep('${depCur._id}')" style="border:none;background:none;color:#006a8a;font-weight:800;cursor:pointer;font-family:inherit;">Ver</button></div>`;
+  } else box.innerHTML='';
+}
+async function depPrepararArchivo(file){
+  if(/^image\/(jpeg|png|webp)$/.test(file.type) && window.createImageBitmap){
+    try{
+      const img=await createImageBitmap(file);
+      const k=Math.min(1,1600/Math.max(img.width,img.height));
+      const c=document.createElement('canvas'); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.82));
+      if(blob && blob.size<file.size) return {blob,tipo:'image/jpeg',ext:'jpg'};
+    }catch(e){}
+  }
+  const ext=((file.name||'').split('.').pop()||'').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,5) || (file.type==='application/pdf'?'pdf':'jpg');
+  return {blob:file,tipo:file.type||'application/octet-stream',ext};
+}
+async function depSubirSoporte(depId,file){
+  const con=idConsorcio(); if(!con) throw new Error('sin consorcio');
+  const p=await depPrepararArchivo(file);
+  const path=`${con}/depositos/${depId}/${Date.now()}.${p.ext}`;
+  const {error}=await sb.storage.from('soportes').upload(path,p.blob,{contentType:p.tipo,upsert:false});
+  if(error) throw error;
+  return {path,tipo:p.tipo,nombre:String(file.name||('soporte.'+p.ext)).slice(0,120)};
+}
+async function verSoporteDep(id){
+  const x=(state.depositos||[]).find(d=>d._id===id); if(!x||!x.soportePath) return;
+  const w=window.open('','_blank');
+  try{
+    const {data,error}=await sb.storage.from('soportes').createSignedUrl(x.soportePath,600);
+    if(error) throw error;
+    if(w) w.location.href=data.signedUrl; else window.location.href=data.signedUrl;
+  }catch(e){ if(w) w.close(); console.error(e); toast('No se pudo abrir el soporte.',false); }
+}
+function editarDeposito(id){
+  if(!puedeEditar('depositos')) return;
+  depCur=(state.depositos||[]).find(d=>d._id===id)||null; depArchivo=null;
+  if(depCur){ depTab='reg'; renderDepositos(); window.scrollTo(0,0); }
+}
+function cancelarEdicionDep(){ depCur=null; depArchivo=null; renderDepositos(); }
+async function guardarDeposito(){
+  if(!puedeEditar('depositos')){ toast('No tienes permiso para editar.',false); return; }
+  const f1=document.getElementById('depF1').value;
+  const f2=depModo==='periodo'?document.getElementById('depF2').value:f1;
+  const monto=Math.round((parseFloat(document.getElementById('depMonto').value)||0)*100)/100;
+  if(!f1||!f2){ toast('Falta la fecha',false); return; }
+  if(f2<f1){ toast('La fecha final es antes de la inicial',false); return; }
+  const m1=depMesDe(f1), m2=depMesDe(f2);
+  if(m1.anio!==m2.anio||m1.mes!==m2.mes){ toast('El período cruza de un mes a otro: regístralo en dos partes.',false); return; }
+  if(f2>todayISO()){ toast('La fecha no puede ser futura',false); return; }
+  if(!depBanca){ toast('Elige la banca',false); return; }
+  if(!depBanco){ toast('Elige el banco',false); return; }
+  if(!(monto>0)){ toast('Escribe el monto depositado',false); return; }
+  const fila={sucursal:normBranchName(depBanca),banco:depBanco,monto,fecha_desde:f1,fecha_hasta:f2,
+    referencia:(document.getElementById('depRef').value||'').trim()||null};
+  if(!depCur){
+    const dup=(state.depositos||[]).find(x=>x.sucursal===fila.sucursal&&x.banco===fila.banco&&Math.abs(x.monto-monto)<0.005&&x.desde===f1&&x.hasta===f2);
+    if(dup && !confirm(`Ya hay un depósito igual: ${psCorto(fila.sucursal)}, ${fila.banco}, RD$${fmt(monto)}, ${depFechaTxt(dup)}.\n\n¿Registrarlo otra vez?`)) return;
+  }
+  return conBloqueo('btnGuardarDep', async()=>{
+    setSyncState('saving');
+    const editando=!!depCur; let reg;
+    try{
+      if(editando){
+        const {error}=await sb.from('depositos_banca').update(fila).eq('id',depCur._id);
+        if(error) throw error;
+        Object.assign(depCur,{sucursal:fila.sucursal,banco:fila.banco,monto,desde:f1,hasta:f2,ref:fila.referencia||''});
+        reg=depCur;
+      } else {
+        fila.creado_por=currentUser||null;
+        const {data,error}=await sb.from('depositos_banca').insert(fila).select();
+        if(error) throw error;
+        reg=depDesdeFila(data[0]); state.depositos.push(reg);
+      }
+    }catch(e){ console.error(e); setSyncState('error'); toast('NO se guardó. Revisa tu conexión.',false); return; }
+    if(depArchivo){
+      try{
+        const viejo=reg.soportePath;
+        const s=await depSubirSoporte(reg._id,depArchivo);
+        const {error}=await sb.from('depositos_banca').update({soporte_path:s.path,soporte_tipo:s.tipo,soporte_nombre:s.nombre}).eq('id',reg._id);
+        if(error){ sb.storage.from('soportes').remove([s.path]).then(()=>{}); throw error; }
+        reg.soportePath=s.path; reg.soporteTipo=s.tipo; reg.soporteNombre=s.nombre;
+        if(viejo) sb.storage.from('soportes').remove([viejo]).then(()=>{});
+      }catch(e){
+        console.error(e); setSyncState('error');
+        toast('El depósito se guardó, pero el soporte NO se subió. Ábrelo y vuelve a adjuntarlo.',false);
+        depArchivo=null; depCur=null; renderDepositos(); try{ renderDash(); }catch(_){}
+        return;
+      }
+    }
+    setSyncState('ok');
+    toast(editando?'Depósito actualizado':`Depósito de ${psCorto(fila.sucursal)} guardado`,true);
+    depF1Ult=f1; depF2Ult=f2;
+    if(!editando){ const bs=bancasDep(); const i=bs.findIndex(b=>b.name===depBanca); depBanca=(bs[i+1]||{}).name||''; }
+    depCur=null; depArchivo=null; renderDepositos();
+    try{ renderDash(); }catch(e){}
+  });
+}
+async function borrarDeposito(){
+  const x=depCur; if(!x||!puedeEditar('depositos')) return;
+  if(!confirm(`¿Borrar el depósito de ${psCorto(x.sucursal)} por RD$${fmt(x.monto)} (${depFechaTxt(x)})?`)) return;
+  return conBloqueo('btnBorrarDep', async()=>{
+    setSyncState('saving');
+    try{
+      const {error}=await sb.from('depositos_banca').delete().eq('id',x._id);
+      if(error) throw error;
+      if(x.soportePath) sb.storage.from('soportes').remove([x.soportePath]).then(()=>{});
+      state.depositos=state.depositos.filter(d=>d._id!==x._id);
+      setSyncState('ok'); toast('Depósito borrado',true);
+      depCur=null; depArchivo=null; renderDepositos(); try{ renderDash(); }catch(e){}
+    }catch(e){ console.error(e); setSyncState('error'); toast('NO se borró. Revisa tu conexión.',false); }
+  });
+}
+
+/* ---------- Resumen por banca y banco ---------- */
+function depRango(){
+  const hoy=todayISO();
+  if(depPer==='mes'||depPer==='mesant'){
+    let {anio,mes}=depMesDe(hoy); if(depPer==='mesant'){ mes--; if(mes<0){ mes=11; anio--; } }
+    return {titulo:`${MONTHS[mes]} ${anio}`, f:x=>{ const m=depMesDe(x.hasta); return m.anio===anio&&m.mes===mes; }};
+  }
+  if(depPer==='semana'){
+    const d=new Date(hoy+'T00:00:00'); const k=(d.getDay()+6)%7; d.setDate(d.getDate()-k); const lun=isoLocal(d);
+    return {titulo:'Esta semana', f:x=>x.hasta>=lun&&x.hasta<=hoy};
+  }
+  const a=depRDesde||sumarDias(hoy,-30), b=depRHasta||hoy;
+  return {titulo:`${fmtDate(a)} – ${fmtDate(b)}`, f:x=>x.hasta>=a&&x.hasta<=b};
+}
+function setDepPer(p){ depPer=p; depDetBanca=null; renderDepResumen(); }
+function depRangoFechas(){ depRDesde=document.getElementById('depRD').value; depRHasta=document.getElementById('depRH').value; renderDepResumen(); }
+function toggleDepDet(n){ depDetBanca = depDetBanca===n ? null : n; renderDepResumen(); }
+function renderDepResumen(){
+  const R=depRango();
+  const lista=(state.depositos||[]).filter(R.f);
+  const total=lista.reduce((s,x)=>s+x.monto,0);
+  const bancosOrden=bancosDepActivos().map(b=>b.nombre);
+  const bancos=[...new Set(lista.map(x=>x.banco))].sort((a,b)=>{ const ia=bancosOrden.indexOf(a), ib=bancosOrden.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b,'es'); });
+  const filasB=bancasDep().map(b=>b.name);
+  lista.forEach(x=>{ if(!filasB.includes(x.sucursal)) filasB.push(x.sucursal); });
+  const cel={}; lista.forEach(x=>{ const k=x.sucursal+'|'+x.banco; cel[k]=(cel[k]||0)+x.monto; });
+  const porBanco=b=>lista.filter(x=>x.banco===b).reduce((s,x)=>s+x.monto,0);
+  const porBanca=n=>lista.filter(x=>x.sucursal===n).reduce((s,x)=>s+x.monto,0);
+  const chip=(k,l)=>`<button type="button" onclick="setDepPer('${k}')" style="${depChipStyle(depPer===k)}">${l}</button>`;
+  const cols=`grid-template-columns:minmax(52px,.9fr) repeat(${bancos.length},minmax(0,1fr)) minmax(0,1.1fr)`;
+  document.getElementById('depBody').innerHTML=`
+  <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;">${chip('mes','Este mes')}${chip('mesant','Mes anterior')}${chip('semana','Esta semana')}${chip('rango','Elegir fechas')}</div>
+  ${depPer==='rango'?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+    <div><label class="dep-lbl" for="depRD">Desde</label><input type="date" id="depRD" value="${depRDesde||sumarDias(todayISO(),-30)}" onchange="depRangoFechas()"></div>
+    <div><label class="dep-lbl" for="depRH">Hasta</label><input type="date" id="depRH" value="${depRHasta||todayISO()}" onchange="depRangoFechas()"></div></div>`:''}
+  <div style="font-size:12px;color:var(--muted);font-weight:700;margin:0 2px 8px;">${escD(R.titulo)} · por fecha final del depósito</div>
+  ${!lista.length?'<div class="panel"><div class="empty-hint" style="padding:24px;">No hay depósitos en este período.</div></div>':`
+  <div style="display:grid;grid-template-columns:repeat(${Math.min(3,bancos.length)},minmax(0,1fr));gap:8px;margin-bottom:14px;">
+    ${bancos.map(b=>{ const t=porBanco(b), nb=new Set(lista.filter(x=>x.banco===b).map(x=>x.sucursal)).size;
+      return `<div class="panel" style="padding:11px 10px;margin:0;"><div style="font-size:11px;color:var(--muted);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escD(b)}</div><div style="font-size:15px;font-weight:800;margin-top:2px;">${fmt(t)}</div><div style="font-size:10.5px;color:var(--muted);">${Math.round(t/total*100)}% · ${nb} banca${nb===1?'':'s'}</div></div>`; }).join('')}
+  </div>
+  <div class="panel" style="padding:14px;">
+    <div class="panel-head"><h3>Por banca y banco</h3><span class="hint">RD$ · total ${fmt(total)}</span></div>
+    <div style="display:grid;${cols};gap:4px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;padding:6px 0;border-bottom:1px solid #edf1f3;">
+      <span>Banca</span>${bancos.map(b=>`<span style="text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escD(b)}</span>`).join('')}<span style="text-align:right;">Total</span></div>
+    ${filasB.map(n=>{ const t=porBanca(n); const abierto=depDetBanca===n;
+      return `<div onclick="toggleDepDet(this.dataset.v)" data-v="${escD(n)}" style="display:grid;${cols};gap:4px;font-size:12.5px;padding:9px 0;border-bottom:1px solid #f1f4f5;cursor:${t?'pointer':'default'};${abierto?'background:#f4f9fb;':''}">
+        <span style="font-weight:700;">${escD(psCorto(n))}</span>
+        ${bancos.map(b=>{ const v=cel[n+'|'+b]||0; return `<span style="text-align:right;${v?'':'color:var(--muted-light);'}">${v?fmt(v):'—'}</span>`; }).join('')}
+        <span style="text-align:right;font-weight:800;${t?'':'color:var(--muted-light);'}">${t?fmt(t):'0'}</span></div>
+        ${abierto&&t?`<div style="background:#f4f9fb;border-radius:0 0 10px 10px;padding:2px 10px 6px;margin-bottom:4px;">${lista.filter(x=>x.sucursal===n).sort((a,b)=>b.hasta.localeCompare(a.hasta)).map(x=>depFilaHTML(x,true)).join('')}</div>`:''}`; }).join('')}
+    <div style="display:grid;${cols};gap:4px;font-size:12.5px;padding:10px 0 2px;font-weight:800;">
+      <span>Total</span>${bancos.map(b=>`<span style="text-align:right;">${fmt(porBanco(b))}</span>`).join('')}<span style="text-align:right;color:var(--green);">${fmt(total)}</span></div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:8px;">Toca una banca para ver cada depósito.</div>
+  </div>
+  <button type="button" onclick="exportarDepositosCSV()" style="width:100%;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:11px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Exportar (CSV)</button>`}`;
+}
+function exportarDepositosCSV(){
+  const R=depRango();
+  const lista=(state.depositos||[]).filter(R.f).sort((a,b)=>a.hasta.localeCompare(b.hasta)||a.sucursal.localeCompare(b.sucursal));
+  const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+  const L=['Desde,Hasta,Banca,Banco,Monto,Referencia,Soporte'];
+  lista.forEach(x=>L.push([x.desde,x.hasta,q(x.sucursal),q(x.banco),x.monto.toFixed(2),q(x.ref),x.soportePath?'Sí':'No'].join(',')));
+  L.push(['','',q('TOTAL'),'',lista.reduce((s,x)=>s+x.monto,0).toFixed(2),'',''].join(','));
+  const url=URL.createObjectURL(new Blob(['﻿'+L.join('\n')],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a'); a.href=url; a.download=`depositos_bancas_${R.titulo.replace(/[^A-Za-z0-9]+/g,'_')}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+  toast('Archivo descargado',true);
+}
+
+/* ---------- Inicio: Deportiva real ---------- */
+function renderDepInicio(txns,depM){
+  const depTot=depM.reduce((s,x)=>s+x.monto,0);
+  const card=document.getElementById('depCardSub');
+  if(card){
+    const ay=yesterdayISO(); const ayer=(state.depositos||[]).filter(x=>x.hasta===ay).reduce((s,x)=>s+x.monto,0);
+    card.textContent = depTot>0 ? `Este mes: RD$${fmt(depTot)}${ayer?` · ayer RD$${fmt(ayer)}`:''}` : 'Lo que las bancas depositan al banco';
+  }
+  const panel=document.getElementById('depDeportivaPanel');
+  if(!panel) return;
+  if(!(depTot>0)){ panel.style.display='none'; panel.innerHTML=''; return; }
+  const sis={}; txns.filter(t=>t.type==='income'&&t.category==='Deportiva').forEach(t=>{ sis[t.branch]=(sis[t.branch]||0)+t.amount; });
+  const dep={}; depM.forEach(x=>{ dep[x.sucursal]=(dep[x.sucursal]||0)+x.monto; });
+  const nombres=bancasDep().map(b=>b.name); Object.keys(sis).concat(Object.keys(dep)).forEach(n=>{ if(!nombres.includes(n)&&!isOfficeBranch(n)) nombres.push(n); });
+  const filas=nombres.filter(n=>(sis[n]||0)!==0||(dep[n]||0)!==0);
+  const T={s:0,d:0}; filas.forEach(n=>{ T.s+=sis[n]||0; T.d+=dep[n]||0; });
+  const col=v=>v<0?'color:var(--red);':'';
+  const g='display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr;gap:4px;';
+  panel.style.display='';
+  panel.innerHTML=`<div class="panel-head"><h3>Deportiva por banca</h3><span class="hint">mes · RD$</span></div>
+    <div style="${g}font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:6px 0;border-bottom:1px solid #edf1f3;"><span>Banca</span><span style="text-align:right;">Sistema</span><span style="text-align:right;">Depósitos</span><span style="text-align:right;">Real</span></div>
+    ${filas.map(n=>{ const s=sis[n]||0, d=dep[n]||0, r=s+d;
+      return `<div style="${g}font-size:13px;padding:7px 0;border-bottom:1px solid #f1f4f5;"><span style="font-weight:700;">${escD(psCorto(n))}</span><span style="text-align:right;${col(s)}">${fmt(s)}</span><span style="text-align:right;${d?'':'color:var(--muted-light);'}">${d?fmt(d):'—'}</span><span style="text-align:right;font-weight:800;${r<0?'color:var(--red);':'color:var(--green);'}">${fmt(r)}</span></div>`; }).join('')}
+    <div style="${g}font-size:13px;padding:9px 0 0;font-weight:800;"><span>Total</span><span style="text-align:right;${col(T.s)}">${fmt(T.s)}</span><span style="text-align:right;">${fmt(T.d)}</span><span style="text-align:right;${T.s+T.d<0?'color:var(--red);':'color:var(--green);'}">${fmt(T.s+T.d)}</span></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.45;">Los depósitos ya vienen restados en el balance de Deportiva que se inserta. Aquí se suman de vuelta solo para ver la Deportiva real; el Corte Diario y el Balance Neto no cambian.</div>`;
+}
+
 /* ===================== EQUIPOS Y MANTENIMIENTO ===================== */
 const EQ_TIPOS=['Aire acondicionado','Inversor','Baterías','Planta','PC','TV','Cámaras','Impresora','Router / Internet','Mobiliario','General'];
 const EQ_SERVICIOS=['Mantenimiento','Reparación','Cambio','Instalación'];
@@ -4353,8 +5146,39 @@ function mesesDelRango(){
 function bancasActivas(){ return sortBranchesNum(state.branches.filter(b=>!b.isOffice&&b.activa!==false&&enGrupo(b.name))).map(b=>b.name); }
 function anIncluyeProrrateo(){ const el=document.getElementById('anProrrateo'); return !el||el.checked; }
 
+/* v7.4: fuente de ingresos. "cuadre" = lo mismo que el Cuadre Mensual por banca
+   (Balance de bancas + Máquinas neto + tu parte de Virtuales), que es el estado
+   de resultados oficial y tiene datos desde enero. "diario" = ingresos del día a día. */
+function anFuente(){ const el=document.getElementById('anFuente'); return el?el.value:'cuadre'; }
+function anSumaDepositos(){ const el=document.getElementById('anDepositos'); return !el||el.checked; }
+function anDepositosBanca(branch, anio, mes){
+  if(!anSumaDepositos()) return 0;
+  return depositosMes(anio, mes-1).filter(x=>x.sucursal===branch).reduce((s,x)=>s+x.monto,0);
+}
+function cbIngresosMes(branch, anio, mes){
+  const am=cbMesCur, aa=cbAnioCur; const r={total:0,cats:{}};
+  try{
+    cbMesCur=mes; cbAnioCur=anio;
+    const bce=CB_INGRESO_CATS.reduce((s,c)=>s+cbIngresoVal(branch,c),0);
+    const maq=cbMaqNetoBanca(branch), vir=cbVirtNetoBanca(branch);
+    if(bce) r.cats['Balance de bancas']=bce;
+    if(maq) r.cats['Máquinas (neto)']=maq;
+    if(vir) r.cats['Virtuales (tu parte)']=vir;
+    r.total=bce+maq+vir;
+  }finally{ cbMesCur=am; cbAnioCur=aa; }
+  return r;
+}
 /* Ingresos de una banca en un mes, abiertos por renglón. */
 function anIngresos(branch, anio, mes){
+  let r;
+  if(anFuente()==='cuadre') r=cbIngresosMes(branch, anio, mes);
+  else r=anIngresosDiario(branch, anio, mes);
+  // El Balance de bancas del Cuadre Mensual ya es lo real (venta menos premios): ahí NO se suman depósitos.
+  const dep = anFuente()==='diario' ? anDepositosBanca(branch, anio, mes) : 0;
+  if(dep){ r.cats['Depósitos de bancas']=(r.cats['Depósitos de bancas']||0)+dep; r.total+=dep; }
+  return r;
+}
+function anIngresosDiario(branch, anio, mes){
   const r={total:0, cats:{}};
   state.txns.forEach(t=>{
     if(t.type!=='income'||t.branch!==branch) return;
@@ -4521,6 +5345,7 @@ function renderAnalisis(){
   if(!anDesdeCur||!anHastaCur) return;
   if(anDesdeCur>anHastaCur){ const t=anDesdeCur; anDesdeCur=anHastaCur; anHastaCur=t;
     document.getElementById('anDesde').value=anDesdeCur; document.getElementById('anHasta').value=anHastaCur; }
+  { const dl=document.getElementById('anDepositosLbl'); if(dl) dl.style.display = anFuente()==='diario' ? 'flex' : 'none'; }
   const D=anDatos(), P=anDatosPrevios();
 
   // aviso: meses sin gastos cargados distorsionan la rentabilidad
@@ -4559,13 +5384,13 @@ function renderAnalisis(){
   document.getElementById('anRanking').innerHTML = rank.length ? `
     <div class="panel" style="padding:14px;margin-bottom:12px;">
       <div style="font-size:13px;font-weight:800;margin-bottom:4px;">Rentabilidad por banca</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">De la que más deja a la que menos${anIncluyeProrrateo()?' · con Administración prorrateada':' · sin cargar Administración'}</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">De la que más deja a la que menos · ${anFuente()==='cuadre'?'según el Cuadre Mensual':'según los movimientos diarios'}${anFuente()==='diario'&&anSumaDepositos()?' · con depósitos':''}${anIncluyeProrrateo()?' · con Administración prorrateada':' · sin cargar Administración'} · <b>toca una banca para ver su ficha</b></div>
       <table class="an-tbl"><thead><tr><th>Banca</th><th>Ingresos</th><th>Gastos</th><th>Resultado</th><th>Margen</th></tr></thead><tbody>
       ${rank.map((r,i)=>{
         const medalla = i===0?'🥇' : (i===rank.length-1?'🔻':'');
         const prevR = P&&P.porBanca[r.banca] ? P.porBanca[r.banca].resultado : null;
-        return `<tr>
-          <td>${medalla} ${r.banca.replace('PRIME SPORT','PS')}${prevR!==null?' '+anPct(r.resultado,prevR):''}</td>
+        return `<tr data-banca="${escD(r.banca)}" onclick="anFicha(this.dataset.banca)" style="cursor:pointer;">
+          <td>${medalla} ${escD(r.banca.replace('PRIME SPORT','PS'))}${prevR!==null?' '+anPct(r.resultado,prevR):''}</td>
           <td>${fmt(r.ingresos)}</td>
           <td style="color:var(--muted);">${fmt(r.gastos)}</td>
           <td style="font-weight:800;color:${colorRes(r.resultado)};">${fmt(r.resultado)}</td>
@@ -4600,6 +5425,38 @@ function renderAnalisis(){
   document.getElementById('anRenglones').innerHTML=anBarrasH('Ingresos por renglón', D.renglones, '#0086AD', P?P.renglones:null);
   document.getElementById('anGastos').innerHTML=anBarrasH('En qué se va el dinero', D.gastosCat, '#e07a2b', P?P.gastosCat:null);
   document.getElementById('anProyeccion').innerHTML=anProyeccionHtml(D);
+  if(anFichaBanca && D.bancas.includes(anFichaBanca)) anFicha(anFichaBanca, D, true); else document.getElementById('anFicha').innerHTML='';
+}
+
+/* v7.4: ficha de una banca — mes a mes, de dónde sale la ganancia y en qué se va. */
+let anFichaBanca=null;
+function anFicha(banca, D, silencio){
+  D=D||anDatos(); anFichaBanca=banca;
+  const b=D.porBanca[banca]; if(!b){ document.getElementById('anFicha').innerHTML=''; return; }
+  const cats=[...new Set(D.meses.flatMap(m=>Object.keys(b.meses[m.clave].catsIng)))];
+  const gas={}; D.meses.forEach(m=>{ const c=b.meses[m.clave].catsGas; Object.keys(c).forEach(k=>gas[k]=(gas[k]||0)+c[k]); });
+  const filas=D.meses.map(m=>{ const c=b.meses[m.clave]; const vacio=Math.abs(c.ingresos)<1&&Math.abs(c.gastos)<1;
+    return `<tr${vacio?' style="opacity:.45;"':''}><td>${MONTHS_SHORT[m.mes-1]} ${String(m.anio).slice(2)}</td>${cats.map(k=>`<td>${c.catsIng[k]?fmt(c.catsIng[k]):'—'}</td>`).join('')}
+      <td style="font-weight:700;">${fmt(c.ingresos)}</td><td style="color:var(--muted);">${c.gastos?fmt(c.gastos):'<span title="Sin gastos cargados" style="color:#a37416;">sin gastos</span>'}</td>
+      <td style="font-weight:800;color:${colorRes(c.resultado)};">${fmt(c.resultado)}</td><td style="color:${c.margen!==null?colorRes(c.margen):'var(--muted)'};font-weight:700;">${c.margen!==null?(c.margen*100).toFixed(0)+'%':'—'}</td></tr>`; }).join('');
+  const tot=`<tr style="border-top:2px solid var(--navy);"><td>TOTAL</td>${cats.map(k=>`<td>${fmt(D.meses.reduce((s,m)=>s+(b.meses[m.clave].catsIng[k]||0),0))}</td>`).join('')}
+      <td style="font-weight:800;">${fmt(b.ingresos)}</td><td style="color:var(--muted);">${fmt(b.gastos)}</td><td style="font-weight:800;color:${colorRes(b.resultado)};">${fmt(b.resultado)}</td><td style="font-weight:700;">${b.margen!==null?(b.margen*100).toFixed(0)+'%':'—'}</td></tr>`;
+  const mejor=D.meses.slice().sort((x,y)=>b.meses[y.clave].resultado-b.meses[x.clave].resultado)[0];
+  const peor=D.meses.slice().sort((x,y)=>b.meses[x.clave].resultado-b.meses[y.clave].resultado)[0];
+  document.getElementById('anFicha').innerHTML=`
+    <div class="panel" style="padding:14px;margin-bottom:12px;border:2px solid var(--cerulean);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px;">
+        <div style="font-size:15px;font-weight:800;">Ficha · ${escD(banca)}</div>
+        <button onclick="anFichaBanca=null;document.getElementById('anFicha').innerHTML=''" aria-label="Cerrar ficha" style="border:none;background:#eef2f4;border-radius:9px;width:32px;height:32px;font-size:16px;cursor:pointer;">×</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Resultado del período: <b style="color:${colorRes(b.resultado)};">RD$${fmt(b.resultado)}</b>${b.margen!==null?` · margen ${(b.margen*100).toFixed(1)}%`:''}${mejor?` · mejor mes ${MONTHS_SHORT[mejor.mes-1]} (RD$${fmt(b.meses[mejor.clave].resultado)})`:''}${peor&&peor!==mejor?` · peor ${MONTHS_SHORT[peor.mes-1]} (RD$${fmt(b.meses[peor.clave].resultado)})`:''}</div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <table class="an-tbl" style="min-width:${260+cats.length*90}px;"><thead><tr><th>Mes</th>${cats.map(k=>`<th>${escD(k)}</th>`).join('')}<th>Ingresos</th><th>Gastos</th><th>Resultado</th><th>Margen</th></tr></thead>
+        <tbody>${filas}${tot}</tbody></table>
+      </div>
+    </div>
+    ${anBarrasH('En qué se le va el dinero a '+escD(banca.replace('PRIME SPORT','PS')), gas, '#e07a2b', null)}`;
+  if(!silencio) document.getElementById('anFicha').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 /* ---------- Proyección ----------
@@ -4929,15 +5786,59 @@ function openBitacora(){
   if(!esAdmin()){ toast('Solo un administrador puede ver la bitácora.',false); return; }
   showOnlyView('view-bitacora');
   bitOffset=0;
+  const bs=document.getElementById('bitBanca');
+  if(bs && bs.options.length<=1) bs.insertAdjacentHTML('beforeend', sortBranchesNum(state.branches.slice()).map(b=>`<option value="${escD(b.name)}">${escD(b.name)}</option>`).join(''));
+  const us=document.getElementById('bitUsuario');
+  if(us && us.options.length<=1){ sb.rpc('listar_usuarios').then(({data})=>{ (data||[]).forEach(u=>{ if(u.email) us.insertAdjacentHTML('beforeend',`<option value="${escD(u.email)}">${escD(u.email)}</option>`); }); }).catch(()=>{}); }
   document.getElementById('bitLista').innerHTML='<div class="empty-hint" style="padding:30px 10px;">Cargando…</div>';
   cargarBitacora();
 }
 
 const BIT_TABLAS={movimientos:'Movimiento',cuadre_banca_gasto:'Gasto de banca',cuadre_oficina_gasto:'Gasto de oficina',
-                  virtuales_registros:'Virtuales',cierres_dia:'Corte diario',cierres_mes:'Cierre de mes'};
+                  virtuales_registros:'Virtuales',cierres_dia:'Corte diario',cierres_mes:'Cierre de mes',
+                  depositos_banca:'Depósito de banca',bancos_deposito:'Banco',arqueos_caja:'Arqueo de caja',empleados:'Empleado',
+                  empleado_cuenta:'Préstamo / faltante',nomina_detalle:'Nómina',nomina_periodos:'Período de nómina',incentivos:'Incentivo',
+                  mantenimientos:'Mantenimiento',equipos:'Equipo',clave_maestra:'Clave maestra',consorcios:'Consorcio'};
 const BIT_ACCIONES={INSERT:{t:'Creó',c:'#1f9d6b',bg:'var(--green-dim)'},
                     UPDATE:{t:'Cambió',c:'#a37416',bg:'#3a3016'},
-                    DELETE:{t:'Borró',c:'#d3564b',bg:'var(--red-dim)'}};
+                    DELETE:{t:'Borró',c:'#d3564b',bg:'var(--red-dim)'},
+                    DESBLOQUEO:{t:'Desbloqueó',c:'#0086AD',bg:'var(--cerulean-dim)'},
+                    CLAVE_INCORRECTA:{t:'Clave mala',c:'#d3564b',bg:'var(--red-dim)'},
+                    CAMBIO_CLAVE:{t:'Cambió clave',c:'#a37416',bg:'#3a3016'},
+                    DESBLOQUEO_SUPER:{t:'Clave súper',c:'#6b3fa0',bg:'#2a2440'},
+                    CLAVE_RESTABLECIDA:{t:'Clave restablecida',c:'#a37416',bg:'#3a3016'},
+                    MODULO_ACTIVADO:{t:'Activó módulo',c:'#1f9d6b',bg:'var(--green-dim)'},
+                    MODULO_DESACTIVADO:{t:'Desactivó módulo',c:'#d3564b',bg:'var(--red-dim)'}};
+function bitFiltrar(q){
+  const tabla=document.getElementById('bitTabla').value, accion=document.getElementById('bitAccion').value;
+  const usr=(document.getElementById('bitUsuario')||{}).value, banca=(document.getElementById('bitBanca')||{}).value;
+  const de=(document.getElementById('bitDesde')||{}).value, ha=(document.getElementById('bitHasta')||{}).value;
+  if(tabla) q=q.eq('tabla',tabla);
+  if(accion) q=q.eq('accion',accion);
+  if(usr) q=q.eq('correo',usr);
+  if(de) q=q.gte('creado',de+'T00:00:00');
+  if(ha) q=q.lt('creado',sumarDias(ha,1)+'T00:00:00');
+  if(banca){ const b=banca.replace(/"/g,''); q=q.or(`despues->>sucursal.eq."${b}",antes->>sucursal.eq."${b}"`); }
+  return q;
+}
+async function exportarBitacoraCSV(){
+  return conBloqueo('btnBitCsv', async()=>{
+    try{
+      let all=[], from=0;
+      while(from<5000){
+        const {data,error}=await bitFiltrar(sb.from('bitacora').select('*').order('id',{ascending:false})).range(from,from+999);
+        if(error) throw error; all=all.concat(data||[]); if(!data||data.length<1000) break; from+=1000;
+      }
+      const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+      const sinHtml=h=>String(h||'').replace(/<[^>]*>/g,' ').replace(/&gt;/g,'>').replace(/&lt;/g,'<').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\s+/g,' ').trim();
+      const L=['Fecha,Usuario,Acción,Registro,Detalle,Cambios'];
+      all.forEach(r=>{ const ac=BIT_ACCIONES[r.accion]; L.push([q(new Date(r.creado).toLocaleString('es-DO')),q(r.correo),q(ac?ac.t:r.accion),q(BIT_TABLAS[r.tabla]||r.tabla),q(bitQue(r)),q(sinHtml(bitCambios(r)))].join(',')); });
+      const url=URL.createObjectURL(new Blob(['\ufeff'+L.join('\n')],{type:'text/csv;charset=utf-8'}));
+      const a=document.createElement('a'); a.href=url; a.download=`bitacora_${todayISO()}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+      toast(`Bitácora exportada: ${all.length} registro(s)`,true);
+    }catch(e){ console.error(e); toast('No se pudo exportar la bitácora.',false); }
+  });
+}
 
 /* Resume en una línea de qué registro se trata. */
 function bitQue(r){
@@ -4948,6 +5849,11 @@ function bitQue(r){
     return `${que} · ${d.sucursal||''} · RD$${fmt(monto)} · ${d.fecha||''}`;
   }
   if(r.tabla==='cierres_dia') return `Jornada ${d.fecha||''}`;
+  if(r.tabla==='depositos_banca') return `${d.banco||''} · ${d.sucursal||''} · RD$${fmt(Number(d.monto||0))} · ${d.fecha_desde===d.fecha_hasta?(d.fecha_hasta||''):(d.fecha_desde||'')+' a '+(d.fecha_hasta||'')}`;
+  if(r.tabla==='clave_maestra') return (r.despues&&r.despues.motivo)?`Para: ${r.despues.motivo}`:'Clave maestra';
+  if(r.tabla==='empleados') return `${d.nombre||''}${d.sucursal?' · '+d.sucursal:''}`;
+  if(r.tabla==='bancos_deposito') return d.nombre||'';
+  if(r.tabla==='consorcios') return 'Módulo: '+((NOMBRE_OPCIONAL&&NOMBRE_OPCIONAL[d.modulo])||d.modulo||'');
   if(r.tabla==='cierres_mes') return `${MONTHS[(d.mes||1)-1]||''} ${d.anio||''}`;
   if(r.tabla==='virtuales_registros') return `${d.empresa||''} · ${d.sucursal||''} · ${MONTHS_SHORT[(d.mes||1)-1]||''} ${d.anio||''}`;
   if(r.tabla==='cuadre_oficina_gasto') return `${d.categoria||''} · RD$${fmt(Number(d.monto||0))} · ${MONTHS_SHORT[(d.mes||1)-1]||''} ${d.anio||''}`;
@@ -4964,9 +5870,9 @@ function bitCambios(r){
     const a=r.antes[k], b=r.despues[k];
     if(JSON.stringify(a)===JSON.stringify(b)) return;
     const num=!isNaN(parseFloat(a))&&!isNaN(parseFloat(b));
-    const va=num?'RD$'+fmt(Number(a)):(a===null||a===''?'—':String(a));
-    const vb=num?'RD$'+fmt(Number(b)):(b===null||b===''?'—':String(b));
-    filas.push(`<div style="font-size:11.5px;color:var(--muted);margin-top:3px;"><b style="color:var(--ink);">${k}</b>: ${va} → <b style="color:var(--ink);">${vb}</b></div>`);
+    const va=num?'RD$'+fmt(Number(a)):(a===null||a===''?'—':(typeof a==='object'?JSON.stringify(a):String(a)));
+    const vb=num?'RD$'+fmt(Number(b)):(b===null||b===''?'—':(typeof b==='object'?JSON.stringify(b):String(b)));
+    filas.push(`<div style="font-size:11.5px;color:var(--muted);margin-top:3px;"><b style="color:var(--ink);">${escD(k)}</b>: ${escD(va)} → <b style="color:var(--ink);">${escD(vb)}</b></div>`);
   });
   return filas.join('');
 }
@@ -4979,10 +5885,7 @@ async function cargarBitacora(mas){
   if(!mas){ bitOffset=0; cont.innerHTML='<div class="empty-hint" style="padding:30px 10px;">Cargando…</div>'; }
   const PAGE=40;
   try{
-    let q=sb.from('bitacora').select('*').order('id',{ascending:false}).range(bitOffset,bitOffset+PAGE-1);
-    if(tabla) q=q.eq('tabla',tabla);
-    if(accion) q=q.eq('accion',accion);
-    const {data,error}=await q;
+    const {data,error}=await bitFiltrar(sb.from('bitacora').select('*').order('id',{ascending:false})).range(bitOffset,bitOffset+PAGE-1);
     if(error) throw error;
     bitHayMas = data.length===PAGE;
     if(!mas) cont.innerHTML='';
@@ -4999,13 +5902,13 @@ async function cargarBitacora(mas){
       return `<div class="panel" style="padding:11px 13px;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
           <span style="background:${ac.bg};color:${ac.c};font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.4px;">${ac.t}</span>
-          <span style="font-size:11.5px;font-weight:700;color:var(--muted);">${BIT_TABLAS[r.tabla]||r.tabla}</span>
+          <span style="font-size:11.5px;font-weight:700;color:var(--muted);">${escD(BIT_TABLAS[r.tabla]||r.tabla)}</span>
           <span style="flex:1;"></span>
           <span style="font-size:11px;color:var(--muted);white-space:nowrap;">${cuando}</span>
         </div>
-        <div style="font-size:13px;font-weight:700;color:var(--ink);">${bitQue(r)}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--ink);">${escD(bitQue(r))}</div>
         ${bitCambios(r)}
-        <div style="font-size:11px;color:var(--muted);margin-top:5px;">${quien}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px;">${escD(quien)}</div>
       </div>`;
     }).join(''));
     bitOffset+=data.length;
@@ -5287,10 +6190,17 @@ function bankPending(branch){
   // pending = cuadre operativo acumulado - lo que el mensajero ha recolectado
   // Las transferencias (préstamos/devoluciones) NO afectan el pendiente del cuadre
   // porque no son cuadre operativo — son flujo de caja aparte.
-  let totalCuadre=0;
-  const dates=new Set(state.txns.filter(t=>t.branch===branch&&t.type!=='collect').map(t=>t.date));
-  dates.forEach(d=>{ totalCuadre+=dayCuadre(branch,d); });
-  const totalCollected=state.txns.filter(t=>t.type==='collect'&&t.branch===branch).reduce((s,t)=>s+t.moved,0);
+  // v7.2: una sola pasada por los movimientos. Da EXACTAMENTE lo mismo que sumar
+  // dayCuadre() día por día (antes recorría todo una vez por cada día: crecía al cuadrado).
+  let totalCuadre=0, totalCollected=0;
+  for(const t of state.txns){
+    if(t.branch!==branch) continue;
+    if(t.type==='collect'){ totalCollected+=t.moved; continue; }
+    if(t.isOffice) continue;
+    if(t.type==='income') totalCuadre+=t.amount;
+    else if(t.type==='expense') totalCuadre-=t.amount;
+    else if(t.type==='out' && t.outKind!=='transfer') totalCuadre-=t.amount;
+  }
   return totalCuadre-totalCollected;
 }
 
@@ -5768,10 +6678,12 @@ function sendCorteWhatsApp(){
 }
 
 async function reopenCorte(){
-  if(!checkMasterKey())return;
+  if(!(await checkMasterKey('Reabrir el corte del '+fmtDate(corteDateVal))))return;
   setSyncState('saving');
   try{
-    await sb.from('cierres_dia').delete().eq('fecha',corteDateVal);
+    const {data,error}=await sb.from('cierres_dia').delete().eq('fecha',corteDateVal).select('fecha');
+    if(error) throw error;
+    if(!data||!data.length){ setSyncState('error'); toast('No se pudo reabrir: el servidor no lo autorizó. Vuelve a intentarlo.',false); return; }
     state.cierres=state.cierres.filter(f=>f!==corteDateVal);
     setSyncState('ok');
     toast('Corte reabierto',true);
@@ -7532,10 +8444,12 @@ async function reabrirCierreMes(){
   const cierre=state.cierresMes.find(c=>c.anio===cmAnioCur&&c.mes===cmMesCur);
   if(!cierre) return;
   if(!confirm(`¿Reabrir ${MONTHS[cmMesCur-1]} ${cmAnioCur}? Se borrará el registro de cierre.`)) return;
+  if(!(await checkMasterKey(`Reabrir el cierre de ${MONTHS[cmMesCur-1]} ${cmAnioCur}`))) return;
   setSyncState('saving');
   try{
-    const {error}=await sb.from('cierres_mes').delete().eq('id',cierre._id);
+    const {data,error}=await sb.from('cierres_mes').delete().eq('id',cierre._id).select('id');
     if(error)throw error;
+    if(!data||!data.length){ setSyncState('error'); toast('No se pudo reabrir: el servidor no lo autorizó. Vuelve a intentarlo.',false); return; }
     state.cierresMes=state.cierresMes.filter(c=>c._id!==cierre._id);
     setSyncState('ok');
     toast('Mes reabierto',true);
@@ -7920,14 +8834,72 @@ function renderLecHistory(maqId){
   }).join('');
 }
 
-// Master key (encoded, not plain text)
-const _mk='TmFzaGxhMjAwOQ==';
-function checkMasterKey(){
-  const entry=prompt('Clave maestra para desbloquear:');
-  if(entry===null)return false;
-  try{ if(entry===atob(_mk)) return true; }catch(e){}
-  toast('Clave incorrecta',false);
-  return false;
+/* v7.1 (seguridad): la clave maestra ya NO está en el código. Se verifica en
+   Supabase (guardada cifrada), con límite de 5 intentos fallidos cada 15 min.
+   Cada intento queda en la bitácora y un acierto abre un desbloqueo de 10 min
+   que la base exige para reabrir cortes/meses o quitar el candado a una lectura. */
+function pedirClave(titulo){
+  return new Promise(res=>{
+    const w=document.createElement('div');
+    w.style.cssText='position:fixed;inset:0;background:rgba(10,18,24,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px;';
+    w.innerHTML=`<form style="background:#fff;border-radius:16px;padding:18px;width:min(380px,100%);display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-lg);">
+      <div style="font-size:15px;font-weight:800;color:var(--ink);">Clave maestra</div>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.45;"></div>
+      <input type="password" autocomplete="off" required style="font-size:16px;">
+      <div style="display:flex;gap:8px;"><button type="button" data-x style="flex:1;border:1px solid var(--line);background:#fff;border-radius:11px;padding:12px;font-weight:700;font-family:inherit;cursor:pointer;">Cancelar</button>
+      <button type="submit" style="flex:1;border:none;background:var(--navy);color:#fff;border-radius:11px;padding:12px;font-weight:700;font-family:inherit;cursor:pointer;">Desbloquear</button></div></form>`;
+    w.querySelector('form div:nth-child(2)').textContent=titulo||'';
+    const inp=w.querySelector('input');
+    const fin=v=>{ w.remove(); res(v); };
+    w.querySelector('[data-x]').onclick=()=>fin(null);
+    w.querySelector('form').onsubmit=e=>{ e.preventDefault(); fin(inp.value); };
+    document.body.appendChild(w); setTimeout(()=>inp.focus(),30);
+  });
+}
+async function checkMasterKey(motivo){
+  const entry=await pedirClave(motivo?`Para: ${motivo}`:'Escribe la clave para desbloquear.');
+  if(entry===null||entry==='') return false;
+  try{
+    const {data,error}=await sb.rpc('verificar_clave_maestra',{p_clave:entry,p_motivo:motivo||null});
+    if(error) throw error;
+    if(data&&data.ok){
+      if(data.super) setTimeout(()=>toast('Desbloqueado con la clave súper',true),100);
+      else if(data.debe_cambiar&&esAdmin()) setTimeout(()=>toast('Cambia la clave maestra en Ajustes → Clave maestra',false),2600);
+      return true;
+    }
+    if(data&&data.error==='bloqueado'){ toast('Demasiados intentos fallidos. Espera 15 minutos.',false); return false; }
+    if(data&&data.error==='sin_clave'){ toast('Este consorcio todavía no tiene clave maestra. Su administrador debe crearla en Ajustes → Clave maestra.',false); return false; }
+    toast('Clave incorrecta'+(data&&data.intentos_restantes!=null?` · quedan ${data.intentos_restantes} intento(s)`:''),false);
+    return false;
+  }catch(e){ console.error(e); toast('No se pudo verificar la clave. Revisa tu conexión.',false); return false; }
+}
+async function cargarEstadoClave(){
+  try{ const {data,error}=await sb.rpc('clave_maestra_estado'); if(!error&&data){ state.claveEstado=data; try{ renderAlertas(); aplicarPermisos(); }catch(e){} } }catch(e){}
+}
+function openClaveMaestra(){
+  if(!esAdmin()){ toast('Solo el administrador puede cambiar la clave maestra.',false); return; }
+  showOnlyView('view-clave');
+  ['ckActual','ckNueva','ckRepite'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  const e=state.claveEstado||{};
+  document.getElementById('ckActualBox').style.display=e.existe===false?'none':'';
+  document.getElementById('ckAviso').style.display=e.debe_cambiar?'':'none';
+  document.getElementById('ckSuperNota').style.display=(e.es_super&&state.consorcio&&state.consorcio.codigo==='PRIMESPORT')?'':'none';
+}
+async function guardarClaveMaestra(){
+  const a=document.getElementById('ckActual').value, n=document.getElementById('ckNueva').value, r=document.getElementById('ckRepite').value;
+  if(n.length<8){ toast('La clave nueva debe tener al menos 8 caracteres',false); return; }
+  if(n!==r){ toast('La clave nueva no coincide en los dos campos',false); return; }
+  if(n===a){ toast('La clave nueva debe ser distinta de la actual',false); return; }
+  return conBloqueo('btnGuardarClave', async()=>{
+    try{
+      const {data,error}=await sb.rpc('fijar_clave_maestra',{p_actual:a,p_nueva:n});
+      if(error) throw error;
+      if(data!=='OK'){ toast(String(data||'No se pudo cambiar').replace(/^ERROR:\s*/,''),false); return; }
+      ['ckActual','ckNueva','ckRepite'].forEach(id=>document.getElementById(id).value='');
+      state.claveEstado=Object.assign({},state.claveEstado,{existe:true,debe_cambiar:false});
+      toast('Clave maestra cambiada',true); try{ renderAlertas(); }catch(e){} go('settings');
+    }catch(e){ console.error(e); toast('No se pudo cambiar la clave. Revisa tu conexión.',false); }
+  });
 }
 
 async function markMaster(id){
@@ -7944,12 +8916,13 @@ async function markMaster(id){
 }
 
 async function unlockMaster(id){
-  if(!checkMasterKey())return;
+  if(!(await checkMasterKey('Quitar el candado a una lectura maestra')))return;
   const l=state.lecturas.find(x=>x._id===id);
   if(!l)return;
   setSyncState('saving');
   try{
-    await sb.from('lecturas_maquina').update({es_maestra:false}).eq('id',id);
+    const {error}=await sb.from('lecturas_maquina').update({es_maestra:false}).eq('id',id);
+    if(error) throw error;
     l.maestra=false;
     setSyncState('ok'); toast('Lectura desbloqueada',true);
     renderLecHistory(curMaqId);
@@ -9501,7 +10474,16 @@ async function wipeData(){
 
 /* ---------- TOAST ---------- */
 let toastTimer;
-function toast(msg,ok){ const t=document.getElementById('toast'); document.getElementById('toastMsg').textContent=msg; t.querySelector('svg').style.display=ok?'block':'none'; t.style.background=ok?'var(--navy)':'var(--red)'; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200); }
+function toast(msg,ok){
+  // v7.2: si la base rechazó el guardado por una regla, se dice el motivo real
+  if(!ok && /^NO se (guardó|borró)/.test(msg||'') && typeof __ultimoError==='string'){
+    if(/DUPLICADO/.test(__ultimoError)) msg='Ya estaba guardado: ese mismo movimiento se registró hace unos segundos. Revisa antes de repetirlo.';
+    else if(/DIA_CERRADO/.test(__ultimoError)) msg='Ese día tiene el corte cerrado. Reábrelo con la clave maestra para corregir.';
+    else if(/LECTURA_MAESTRA/.test(__ultimoError)) msg='Esa lectura es maestra. Quítale el candado con la clave maestra.';
+    else if(/movimientos_montos_validos/.test(__ultimoError)) msg='El monto no es válido (un gasto o salida debe ser mayor que cero).';
+    __ultimoError='';
+  }
+  const t=document.getElementById('toast'); document.getElementById('toastMsg').textContent=msg; t.querySelector('svg').style.display=ok?'block':'none'; t.style.background=ok?'var(--navy)':'var(--red)'; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200); }
 
 /* ---------- LOGIN & INIT ---------- */
 function setLoginLogo(){ /* text logo, nothing to copy */ }
@@ -9593,12 +10575,19 @@ const MODULOS = [
   ['empleados','Empleados y Nómina','Fichas, nómina quincenal y préstamos'],
   ['equipos','Equipos y Mantenimiento','Inventario y servicios por banca'],
   ['libreta','Libreta de Clientes','Créditos, débitos, depósitos, retiros y bonos'],
+  ['depositos','Depósitos de bancas','Depósitos al banco, soportes y Deportiva real'],
   ['ajustes','Ajustes','Bancas, categorías y configuración']
 ];
 const NIVELES = [['no','Sin acceso'],['ver','Solo ver'],['editar','Ver y editar']];
 
 function esAdmin(){ return (state&&state.rol)==='admin'; }
+/* v7.5: módulos opcionales. Solo existen en un consorcio si el súper administrador
+   los activa (Ajustes → Súper administrador). La base aplica la misma regla. */
+const MODULOS_OPCIONALES=['depositos','libreta'];
+function moduloActivo(mod){ return !MODULOS_OPCIONALES.includes(mod) || !!(state&&state.consorcio&&state.consorcio.modulos&&state.consorcio.modulos[mod]); }
+function esSuper(){ return !!(state&&state.claveEstado&&state.claveEstado.es_super); }
 function nivel(mod){
+  if(!moduloActivo(mod)) return 'no';
   if(esAdmin()) return 'editar';
   return ((state&&state.permisos&&state.permisos[mod])||'no');
 }
@@ -9622,6 +10611,13 @@ function aplicarPermisos(){
   if(it) it.style.display = esAdmin() ? '' : 'none';
   const bit=document.getElementById('setItemBitacora');
   if(bit) bit.style.display = esAdmin() ? '' : 'none';
+  const ck=document.getElementById('setItemClave');
+  if(ck) ck.style.display = esAdmin() ? '' : 'none';
+  const sa=document.getElementById('setItemSuper');
+  if(sa) sa.style.display = esSuper() ? '' : 'none';
+  const ea=document.getElementById('setItemErrores');
+  if(ea) ea.style.display = esAdmin() ? '' : 'none';
+  try{ pintarRespaldoDesc(); }catch(e){}
   const rev=document.getElementById('setItemRevision');
   if(rev) rev.style.display = puedeVer('corte') ? '' : 'none';
   const an=document.getElementById('setItemAnalisis');
@@ -9647,7 +10643,7 @@ function tarjetaUsuario(u, soyYo){
   const p=u.permisos||{};
   const adm=u.rol==='admin';
   const filas = adm ? '<div style="font-size:12.5px;color:var(--muted);padding:6px 0;">Un administrador tiene acceso completo a todos los módulos.</div>'
-    : MODULOS.map(([k,nom,desc])=>{
+    : MODULOS.filter(([k])=>moduloActivo(k)).map(([k,nom,desc])=>{
         const v=p[k]||'no';
         const ops=NIVELES.map(([nv,lbl])=>'<option value="'+nv+'"'+(v===nv?' selected':'')+'>'+lbl+'</option>').join('');
         return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line);">'
@@ -9873,13 +10869,25 @@ async function startApp(){
 // Consorcio activo (RLS solo devuelve el del usuario conectado)
 async function loadConsorcio(){
   try{
-    const { data, error } = await sb.from('consorcios').select('id,codigo,nombre').limit(1);
-    if(error) throw error;
-    state.consorcio = (data&&data[0]) ? data[0] : null;
+    // v7.3: con varios consorcios se usa el ACTIVO de la sesión (antes tomaba
+    // "el primero" y esperaba un solo vínculo por usuario).
+    let lista=[];
+    try{ const r=await sb.rpc('mis_consorcios'); if(!r.error&&Array.isArray(r.data)) lista=r.data; }catch(e){}
+    state.misConsorcios=lista;
+    let act=lista.find(x=>x.es_activo)||null;
+    if(!act){
+      const { data, error } = await sb.from('consorcios').select('id,codigo,nombre').limit(1);
+      if(error) throw error;
+      act=(data&&data[0])||null;
+    }
+    state.consorcio = act ? {id:act.id,codigo:act.codigo,nombre:act.nombre,modulos:{}} : null;
+    if(state.consorcio){
+      try{ const {data:cm}=await sb.from('consorcios').select('modulos_activos').eq('id',state.consorcio.id).maybeSingle(); state.consorcio.modulos=(cm&&cm.modulos_activos)||{}; }catch(e){}
+    }
     const { data:u } = await sb.auth.getUser();
     const uid = u && u.user && u.user.id;
-    if(uid){
-      const { data:v } = await sb.from('usuarios_consorcio').select('rol,permisos,activo').eq('user_id',uid).maybeSingle();
+    if(uid && state.consorcio){
+      const { data:v } = await sb.from('usuarios_consorcio').select('rol,permisos,activo').eq('user_id',uid).eq('consorcio_id',state.consorcio.id).maybeSingle();
       state.rol = (v&&v.rol)||'usuario';
       state.permisos = (v&&v.permisos)||{};
     }
@@ -9887,6 +10895,35 @@ async function loadConsorcio(){
   aplicarPermisos();
   const nom = (state.consorcio&&state.consorcio.nombre) || '—';
   document.querySelectorAll('.js-consorcio').forEach(el=>{ el.textContent=nom; });
+  pintarSelectorConsorcio();
+}
+function pintarSelectorConsorcio(){
+  const p=document.getElementById('consPill'); if(!p) return;
+  const l=state.misConsorcios||[];
+  if(l.length>1){ p.style.display='flex'; document.getElementById('consPillTxt').textContent=(state.consorcio&&state.consorcio.nombre)||'Consorcio'; }
+  else p.style.display='none';
+}
+function abrirSelectorConsorcio(){
+  const l=state.misConsorcios||[]; if(l.length<2) return;
+  const w=document.createElement('div');
+  w.style.cssText='position:fixed;inset:0;background:rgba(10,18,24,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px;';
+  w.innerHTML=`<div style="background:#fff;border-radius:16px;padding:16px;width:min(380px,100%);display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-lg);">
+    <div style="font-size:15px;font-weight:800;margin-bottom:4px;">Cambiar de consorcio</div>
+    ${l.map(x=>`<button type="button" data-id="${x.id}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;border:1.5px solid ${x.es_activo?'var(--cerulean)':'#dde4e8'};background:${x.es_activo?'#e6f4f9':'#fafbfc'};border-radius:11px;padding:13px 14px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;color:var(--ink);text-align:left;">
+      <span>${String(x.nombre).replace(/[<>]/g,'')}</span><span style="font-size:11px;color:var(--muted);font-weight:700;">${x.rol==='admin'?'Administrador':'Usuario'}${x.es_activo?' · actual':''}</span></button>`).join('')}
+    <button type="button" data-x style="border:none;background:none;color:var(--muted);font-weight:700;padding:10px;font-family:inherit;cursor:pointer;">Cancelar</button></div>`;
+  w.onclick=async e=>{
+    if(e.target===w||e.target.closest('[data-x]')){ w.remove(); return; }
+    const b=e.target.closest('[data-id]'); if(!b) return;
+    const id=b.getAttribute('data-id'); if(state.consorcio&&id===state.consorcio.id){ w.remove(); return; }
+    b.disabled=true; b.style.opacity='.6';
+    try{
+      const {data,error}=await sb.rpc('cambiar_consorcio',{p_consorcio:id});
+      if(error||data!=='OK') throw error||new Error(data);
+      location.replace(location.pathname+'?c='+Date.now());
+    }catch(err){ console.error(err); toast('No se pudo cambiar de consorcio.',false); b.disabled=false; b.style.opacity=''; }
+  };
+  document.body.appendChild(w);
 }
 
 async function doLogout(){
